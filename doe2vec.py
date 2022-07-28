@@ -14,23 +14,48 @@ import numpy as np
 
 d = 2
 m = 8 #power of 2 for sample size
-seed = 42
+seed = 0
 
-#first generate one DOE using SOBOL
-sampler = qmc.Sobol(d=d, scramble=False, seed = seed)
-sample = sampler.random_base2(m=m)
+class Doe2Vec():
+    def __init__(self, dim, m, n=1000, latent_dim=32, seed=0):
+        self.dim = dim
+        self.m = m
+        self.n = n
+        self.latent_dim = latent_dim
+        self.seed = seed
+        #generate the DOE using Sobol
+        self.sampler = qmc.Sobol(d=self.dim, scramble=False, seed = self.seed)
+        self.sample = self.sampler.random_base2(m=self.m)
 
-# create an artificial function
-tree = genTree.generate_tree(8, 12)
-exp = genTree2exp.generate_tree2exp(tree)
-fun = genExp2fun.generate_exp2fun(exp, len(sample), sample.shape[1])
 
-# skip if function generation failed
+    def generateData(self):
+        array_x = self.sample #it is required to be named array_x for the eval
+        self.Y = []
+        tries = 0
+        while len(self.Y) < self.n:
+            tries += 1
+            # create an artificial function
+            tree = genTree.generate_tree(6, 12)
+            exp = genTree2exp.generate_tree2exp(tree)
+            fun = genExp2fun.generate_exp2fun(exp, len(self.sample), self.sample.shape[1])
+            try:
+                array_y = eval(fun)
+                if (np.isnan(array_y).any() or np.isinf(array_y).any() or np.any(abs(array_y)<1e-8) or np.any(abs(array_y)>1e8) 
+                    or np.var(array_y)<1.0 or array_y.ndim!=1):
+                    continue
+                #normalize the train data (this should be done per row (not per column!))
+                self.Y.append(array_y.flatten())
+            except:
+                continue
+        print(tries)
+        return self.Y
+        
 
-array_x = sample
-array_y = eval(fun)
-print(array_y.shape)
+obj = Doe2Vec(d, m, n=1000)
+y = np.array(obj.generateData())
+print(y.shape)
 
+a = aaa
 # END fun
 
 
@@ -62,7 +87,7 @@ class Autoencoder(Model):
 autoencoder = Autoencoder(latent_dim, len(array_y))
 autoencoder.compile(optimizer='adam', loss=losses.MeanSquaredError())
 
-#normalize the train data
+#normalize the train data (this should be done per row (not per column!))
 
 """
 min_val = tf.reduce_min(train_data)
