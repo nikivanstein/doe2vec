@@ -117,7 +117,7 @@ def injection(tree):
         tree = Node(11, tree, Node(28, tree))
     elif r < 0.25:
         # Highly multimodal landscape
-    	tree = Node(11, tree, Node(23, Node(28, tree)))
+        tree = Node(11, tree, Node(23, Node(28, tree)))
     elif r < 0.3:
         # Linkages between all the variables and the first variable
         tree = injection2(tree, 1)
