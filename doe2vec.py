@@ -1,9 +1,11 @@
 from modulesRandFunc import generate_tree as genTree
 from modulesRandFunc import generate_tree2exp as genTree2exp
 from modulesRandFunc import generate_exp2fun as genExp2fun
+from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib import cm
 import tensorflow as tf
 from sklearn.metrics import accuracy_score, precision_score, recall_score
 from sklearn.model_selection import train_test_split
@@ -15,6 +17,26 @@ import numpy as np
 d = 2
 m = 8 #power of 2 for sample size
 seed = 0
+
+class Autoencoder(Model):
+  def __init__(self, latent_dim, sample_size):
+    super(Autoencoder, self).__init__()
+    self.latent_dim = latent_dim   
+    self.encoder = tf.keras.Sequential([
+      layers.Dense(sample_size / 2, activation='relu'),
+      layers.Dense(sample_size / 4, activation='relu'),
+      layers.Dense(latent_dim, activation='relu'),
+    ])
+    self.decoder = tf.keras.Sequential([
+      layers.Dense(sample_size / 4, activation='relu'),
+      layers.Dense(sample_size / 2, activation='relu'),
+      layers.Dense(sample_size, activation='sigmoid')
+    ])
+
+  def call(self, x):
+    encoded = self.encoder(x)
+    decoded = self.decoder(encoded)
+    return decoded
 
 class Doe2Vec():
     def __init__(self, dim, m, n=1000, latent_dim=32, seed=0):
@@ -44,48 +66,53 @@ class Doe2Vec():
                     or np.var(array_y)<1.0 or array_y.ndim!=1):
                     continue
                 #normalize the train data (this should be done per row (not per column!))
-                self.Y.append(array_y.flatten())
+                array_y = array_y.flatten()
+                array_y = (array_y - np.min(array_y)) / (np.max(array_y) - np.min(array_y))
+                self.Y.append(array_y)
             except:
                 continue
-        print(tries)
+        self.Y = np.array(self.Y)
+        self.train_data = tf.cast(self.Y[:-50], tf.float32)
+        self.test_data = tf.cast(self.Y[-50:], tf.float32)
         return self.Y
-        
 
-obj = Doe2Vec(d, m, n=1000)
+    def compileAutoEncoder(self):
+        self.autoencoder = Autoencoder(self.latent_dim, self.Y.shape[1])
+        self.autoencoder.compile(optimizer='adam', loss=losses.MeanSquaredError())
+
+    def train(self, epochs=50):
+        self.autoencoder.fit(self.train_data, self.train_data,
+                epochs=epochs,
+                shuffle=True,
+                validation_data=(self.test_data, self.test_data))
+        encoded_does = self.autoencoder.encoder(self.test_data).numpy()
+        decoded_does = self.autoencoder.decoder(encoded_does).numpy()
+
+        n = 10
+        fig = plt.figure(figsize=(20, 20))
+        for i in range(n):
+            # display original
+            ax = fig.add_subplot(2, n, i+1, projection='3d')
+            ax.plot_trisurf(self.sample[:,0], self.sample[:,1], self.test_data[i],cmap=cm.jet, antialiased = True)
+            plt.title("original")
+            plt.gray()
+
+            # display reconstruction
+            ax = fig.add_subplot(2, n, i+1+n, projection='3d')
+            ax.plot_trisurf(self.sample[:,0], self.sample[:,1],decoded_does[i],cmap=cm.jet,antialiased = True)
+            plt.title("reconstructed")
+            plt.gray()
+        plt.tight_layout()
+        plt.show()
+
+obj = Doe2Vec(d, m, n=10000)
 y = np.array(obj.generateData())
-print(y.shape)
+obj.compileAutoEncoder()
+obj.train()
 
-a = aaa
+
 # END fun
 
-
-# AUTOENCODER part
-
-
-latent_dim = 32
-
-class Autoencoder(Model):
-  def __init__(self, latent_dim, sample_size):
-    super(Autoencoder, self).__init__()
-    self.latent_dim = latent_dim   
-    self.encoder = tf.keras.Sequential([
-      layers.Dense(sample_size / 2, activation='relu'),
-      layers.Dense(sample_size / 4, activation='relu'),
-      layers.Dense(latent_dim, activation='relu'),
-    ])
-    self.decoder = tf.keras.Sequential([
-      layers.Dense(sample_size / 4, activation='relu'),
-      layers.Dense(sample_size / 2, activation='relu'),
-      layers.Dense(sample_size, activation='sigmoid')
-    ])
-
-  def call(self, x):
-    encoded = self.encoder(x)
-    decoded = self.decoder(encoded)
-    return decoded
-
-autoencoder = Autoencoder(latent_dim, len(array_y))
-autoencoder.compile(optimizer='adam', loss=losses.MeanSquaredError())
 
 #normalize the train data (this should be done per row (not per column!))
 
