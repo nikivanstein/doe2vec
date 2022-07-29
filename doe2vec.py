@@ -94,12 +94,16 @@ class Doe2Vec():
             # display original
             ax = fig.add_subplot(2, n, i+1, projection='3d')
             ax.plot_trisurf(self.sample[:,0], self.sample[:,1], self.test_data[i],cmap=cm.jet, antialiased = True)
+            ax.get_xaxis().set_visible(False)
+            ax.get_yaxis().set_visible(False)
             plt.title("original")
             plt.gray()
 
             # display reconstruction
             ax = fig.add_subplot(2, n, i+1+n, projection='3d')
             ax.plot_trisurf(self.sample[:,0], self.sample[:,1],decoded_does[i],cmap=cm.jet,antialiased = True)
+            ax.get_xaxis().set_visible(False)
+            ax.get_yaxis().set_visible(False)
             plt.title("reconstructed")
             plt.gray()
         plt.tight_layout()
@@ -110,51 +114,10 @@ y = np.array(obj.generateData())
 obj.compileAutoEncoder()
 obj.train()
 
-
-# END fun
-
-
-#normalize the train data (this should be done per row (not per column!))
-
 """
-min_val = tf.reduce_min(train_data)
-max_val = tf.reduce_max(train_data)
-
-train_data = (train_data - min_val) / (max_val - min_val)
-test_data = (test_data - min_val) / (max_val - min_val)
-
-train_data = tf.cast(train_data, tf.float32)
-test_data = tf.cast(test_data, tf.float32)
-"""
-
-#train the autoencoder (final step)
-"""
-autoencoder.fit(x_train, x_train,
-                epochs=10,
-                shuffle=True,
-                validation_data=(x_test, x_test))
-
-encoded_imgs = autoencoder.encoder(x_test).numpy()
-decoded_imgs = autoencoder.decoder(encoded_imgs).numpy()
-
-n = 10
-plt.figure(figsize=(20, 4))
-for i in range(n):
-  # display original
-  ax = plt.subplot(2, n, i + 1)
-  plt.imshow(x_test[i])
-  plt.title("original")
-  plt.gray()
-  ax.get_xaxis().set_visible(False)
-  ax.get_yaxis().set_visible(False)
-
-  # display reconstruction
-  ax = plt.subplot(2, n, i + 1 + n)
-  plt.imshow(decoded_imgs[i])
-  plt.title("reconstructed")
-  plt.gray()
-  ax.get_xaxis().set_visible(False)
-  ax.get_yaxis().set_visible(False)
-plt.show()
-
+TODO:
+- optimize parameters of autoencoder
+- check bbob functions, to find corresponding random function
+- display reconstruction errors.
+- perform for 2,5,10,15,20 dimensions
 """
