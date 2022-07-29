@@ -85,25 +85,41 @@ class Doe2Vec():
                 epochs=epochs,
                 shuffle=True,
                 validation_data=(self.test_data, self.test_data))
+
+    def visualizeTestData(self, n=10):
         encoded_does = self.autoencoder.encoder(self.test_data).numpy()
         decoded_does = self.autoencoder.decoder(encoded_does).numpy()
-
-        n = 10
-        fig = plt.figure(figsize=(20, 20))
+        fig = plt.figure(figsize=(n*3, 8))
         for i in range(n):
             # display original
             ax = fig.add_subplot(2, n, i+1, projection='3d')
             ax.plot_trisurf(self.sample[:,0], self.sample[:,1], self.test_data[i],cmap=cm.jet, antialiased = True)
-            ax.get_xaxis().set_visible(False)
-            ax.get_yaxis().set_visible(False)
+            ax.xaxis.set_ticklabels([])
+            ax.yaxis.set_ticklabels([])
+            ax.zaxis.set_ticklabels([])
+
+            for line in ax.xaxis.get_ticklines():
+                line.set_visible(False)
+            for line in ax.yaxis.get_ticklines():
+                line.set_visible(False)
+            for line in ax.zaxis.get_ticklines():
+                line.set_visible(False)
             plt.title("original")
             plt.gray()
 
             # display reconstruction
             ax = fig.add_subplot(2, n, i+1+n, projection='3d')
             ax.plot_trisurf(self.sample[:,0], self.sample[:,1],decoded_does[i],cmap=cm.jet,antialiased = True)
-            ax.get_xaxis().set_visible(False)
-            ax.get_yaxis().set_visible(False)
+            ax.xaxis.set_ticklabels([])
+            ax.yaxis.set_ticklabels([])
+            ax.zaxis.set_ticklabels([])
+
+            for line in ax.xaxis.get_ticklines():
+                line.set_visible(False)
+            for line in ax.yaxis.get_ticklines():
+                line.set_visible(False)
+            for line in ax.zaxis.get_ticklines():
+                line.set_visible(False)
             plt.title("reconstructed")
             plt.gray()
         plt.tight_layout()
@@ -112,12 +128,13 @@ class Doe2Vec():
 obj = Doe2Vec(d, m, n=10000)
 y = np.array(obj.generateData())
 obj.compileAutoEncoder()
-obj.train()
-
+obj.train(50)
+obj.visualizeTestData()
 """
 TODO:
 - optimize parameters of autoencoder
 - check bbob functions, to find corresponding random function
 - display reconstruction errors.
 - perform for 2,5,10,15,20 dimensions
+- fix seed!
 """
