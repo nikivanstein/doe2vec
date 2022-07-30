@@ -187,4 +187,7 @@ TODO:
 - display reconstruction errors.
 - perform for 2,5,10,15,20 dimensions
 - fix seed!
+- Add MLFLOW integration
+    https://medium.com/analytics-vidhya/tensorflow-model-tracking-with-mlflow-e9de29c8e542
+    See also https://github.com/mlflow/mlflow/issues/4982
 """
