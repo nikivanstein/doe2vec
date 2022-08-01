@@ -56,8 +56,18 @@ class Doe2Vec:
         self.sample = self.sampler.random_base2(m=self.m)
 
     def load(self, dir="models"):
-        self.autoencoder = tf.keras.models.load_model(f"{dir}/doe2vec_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}")
-        print("Loaded pre-existng model")
+        self.autoencoder = tf.keras.models.load_model(
+            f"{dir}/model_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}"
+        )
+        self.sample = np.load(
+            f"{dir}/sample_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy"
+        )
+        self.Y = np.load(
+            f"{dir}/data_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy"
+        )
+        self.train_data = tf.cast(self.Y[:-50], tf.float32)
+        self.test_data = tf.cast(self.Y[-50:], tf.float32)
+        print("Loaded pre-existng model and data")
         self.summary()
 
     def generateData(self):
@@ -110,8 +120,17 @@ class Doe2Vec:
         )
 
     def save(self, dir="models"):
-        #Save the mdoel
-        self.autoencoder.save(f"{dir}/doe2vec_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}")
+        # Save the model, sample and data set
+        self.autoencoder.save(
+            f"{dir}/model_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}"
+        )
+        np.save(
+            f"{dir}/sample_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy",
+            self.sample,
+        )
+        np.save(
+            f"{dir}/data_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy", self.Y
+        )
 
     def encode(self, X, return_error=False):
         encoded_doe = self.autoencoder.encoder([X]).numpy()
@@ -176,16 +195,18 @@ class Doe2Vec:
 
 
 obj = Doe2Vec(d, m, n=10000)
-y = np.array(obj.generateData())
-obj.compileAutoEncoder()
-obj.train(50)
+#obj.load()
+obj.generateData()
+obj.compile()
+obj.fit(50)
 obj.visualizeTestData()
+#obj.save()
 """
 TODO:
 - optimize parameters of autoencoder
 - check bbob functions, to find corresponding random function
 - display reconstruction errors.
-- perform for 2,5,10,15,20 dimensions
+- perform for 2-20 dimensions
 - fix seed!
 - Add MLFLOW integration
     https://medium.com/analytics-vidhya/tensorflow-model-tracking-with-mlflow-e9de29c8e542
