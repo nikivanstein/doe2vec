@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import os.path
 import pandas as pd
 import tensorflow as tf
 from matplotlib import cm
@@ -13,10 +14,6 @@ from tensorflow.keras.models import Model
 from modulesRandFunc import generate_exp2fun as genExp2fun
 from modulesRandFunc import generate_tree as genTree
 from modulesRandFunc import generate_tree2exp as genTree2exp
-
-d = 5
-m = 8  # power of 2 for sample size
-seed = 0
 
 
 class Autoencoder(Model):
@@ -56,19 +53,26 @@ class Doe2Vec:
         self.sample = self.sampler.random_base2(m=self.m)
 
     def load(self, dir="models"):
-        self.autoencoder = tf.keras.models.load_model(
-            f"{dir}/model_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}"
-        )
-        self.sample = np.load(
-            f"{dir}/sample_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy"
-        )
-        self.Y = np.load(
-            f"{dir}/data_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy"
-        )
-        self.train_data = tf.cast(self.Y[:-50], tf.float32)
-        self.test_data = tf.cast(self.Y[-50:], tf.float32)
-        print("Loaded pre-existng model and data")
-        self.summary()
+        if (os.path.exists(f"{dir}/sample_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy")):
+            self.autoencoder = tf.keras.models.load_model(
+                f"{dir}/model_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}"
+            )
+            self.sample = np.load(
+                f"{dir}/sample_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy"
+            )
+            self.Y = np.load(
+                f"{dir}/data_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy"
+            )
+            self.train_data = tf.cast(self.Y[:-50], tf.float32)
+            self.test_data = tf.cast(self.Y[-50:], tf.float32)
+            print("Loaded pre-existng model and data")
+            self.summary()
+            return True
+        else:
+            return False
+
+    def getSample(self):
+        return self.sample
 
     def generateData(self):
         array_x = self.sample  # it is required to be named array_x for the eval
@@ -142,10 +146,10 @@ class Doe2Vec:
     def summary(self):
         self.autoencoder.summary()
 
-    def visualizeTestData(self, n=10):
+    def visualizeTestData(self, n=5):
         encoded_does = self.autoencoder.encoder(self.test_data).numpy()
         decoded_does = self.autoencoder.decoder(encoded_does).numpy()
-        fig = plt.figure(figsize=(n * 3, 8))
+        fig = plt.figure(figsize=(n * 5, 10))
         for i in range(n):
             # display original
             ax = fig.add_subplot(2, n, i + 1, projection="3d")
@@ -190,17 +194,19 @@ class Doe2Vec:
                 line.set_visible(False)
             plt.title("reconstructed")
             plt.gray()
-        plt.tight_layout()
         plt.show()
 
 
-obj = Doe2Vec(d, m, n=10000)
-#obj.load()
-obj.generateData()
-obj.compile()
-obj.fit(50)
-obj.visualizeTestData()
-#obj.save()
+if __name__ == "__main__":
+    obj = Doe2Vec(5, 8, n=10000)
+
+    if not obj.load():
+        obj.generateData()
+        obj.compile()
+        obj.fit(50)
+
+    obj.visualizeTestData()
+    #obj.save()
 """
 TODO:
 - optimize parameters of autoencoder
