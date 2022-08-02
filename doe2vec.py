@@ -45,7 +45,7 @@ class Autoencoder(Model):
 
 
 class Doe2Vec:
-    def __init__(self, dim, m, n=1000, latent_dim=32, seed_nr=0, use_mlflow=True):
+    def __init__(self, dim, m, n=1000, latent_dim=32, seed_nr=0, use_mlflow=True, mlflow_name="Doc2Vec"):
         self.dim = dim
         self.m = m
         self.n = n
@@ -58,8 +58,12 @@ class Doe2Vec:
         self.use_mlflow = use_mlflow
         if use_mlflow:
             mlflow.set_tracking_uri("mlflow/")
-            mlflow.set_experiment("Doe2Vec")
-            mlflow.start_run(run_name=f"{self.dim}-{self.m}-{self.latent_dim}-{self.seed}")
+            mlflow.set_experiment(mlflow_name)
+            mlflow.start_run(run_name=f"run {self.dim}-{self.m}-{self.latent_dim}-{self.seed}")
+            mlflow.log_param("dim", self.dim)
+            mlflow.log_param("m", self.m)
+            mlflow.log_param("latent_dim", self.latent_dim)
+            mlflow.log_param("seed", self.seed)
 
     def load(self, dir="models"):
         if (os.path.exists(f"{dir}/sample_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy")):
