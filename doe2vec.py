@@ -136,7 +136,7 @@ class Doe2Vec:
 
     def fit(self, epochs=100):
         if self.use_mlflow:
-            mlflow.tensorflow.autolog(every_n_iter=2)
+            mlflow.tensorflow.autolog(every_n_iter=1)
         self.autoencoder.fit(
             self.train_data,
             self.train_data,
@@ -232,12 +232,14 @@ class Doe2Vec:
 
 if __name__ == "__main__":
     for d in [2,5,10,20]:
-        obj = Doe2Vec(2, 8, n=100000, latent_dim=8)
-        #if not obj.load():
-        obj.generateData()
-        obj.compile()
-        obj.fit(100)
-        obj.save()
+        for m in [8,9,10]:
+            for latent_dim in [8,16,32]:
+                obj = Doe2Vec(d, m, n=d*10000, latent_dim=latent_dim)
+                #if not obj.load():
+                obj.generateData()
+                obj.compile()
+                obj.fit(50)
+                obj.save()
 """
 TODO:
 - optimize parameters of autoencoder
