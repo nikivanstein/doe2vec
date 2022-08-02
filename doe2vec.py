@@ -10,6 +10,9 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score
 from sklearn.model_selection import train_test_split
 from tensorflow.keras import layers, losses
 from tensorflow.keras.models import Model
+import mlflow
+from numpy.random import seed
+import mlflow.tensorflow
 
 from modulesRandFunc import generate_exp2fun as genExp2fun
 from modulesRandFunc import generate_tree as genTree
@@ -42,15 +45,21 @@ class Autoencoder(Model):
 
 
 class Doe2Vec:
-    def __init__(self, dim, m, n=1000, latent_dim=32, seed=0):
+    def __init__(self, dim, m, n=1000, latent_dim=32, seed_nr=0, use_mlflow=True):
         self.dim = dim
         self.m = m
         self.n = n
         self.latent_dim = latent_dim
-        self.seed = seed
+        self.seed = seed_nr
+        seed(self.seed)
         # generate the DOE using Sobol
         self.sampler = qmc.Sobol(d=self.dim, scramble=False, seed=self.seed)
         self.sample = self.sampler.random_base2(m=self.m)
+        self.use_mlflow = use_mlflow
+        if use_mlflow:
+            mlflow.set_tracking_uri("mlflow/")
+            mlflow.set_experiment("Doe2Vec")
+            mlflow.start_run(run_name=f"{self.dim}-{self.m}-{self.latent_dim}-{self.seed}")
 
     def load(self, dir="models"):
         if (os.path.exists(f"{dir}/sample_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy")):
@@ -62,6 +71,9 @@ class Doe2Vec:
             )
             self.Y = np.load(
                 f"{dir}/data_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy"
+            )
+            self.functions = np.load(
+                f"{dir}/functions_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy"
             )
             self.train_data = tf.cast(self.Y[:-50], tf.float32)
             self.test_data = tf.cast(self.Y[-50:], tf.float32)
@@ -77,6 +89,7 @@ class Doe2Vec:
     def generateData(self):
         array_x = self.sample  # it is required to be named array_x for the eval
         self.Y = []
+        self.functions = []
         tries = 0
         while len(self.Y) < self.n:
             tries += 1
@@ -102,26 +115,39 @@ class Doe2Vec:
                 array_y = (array_y - np.min(array_y)) / (
                     np.max(array_y) - np.min(array_y)
                 )
+                self.functions.append(fun)
                 self.Y.append(array_y)
             except:
                 continue
         self.Y = np.array(self.Y)
+        self.functions = np.array(self.functions)
         self.train_data = tf.cast(self.Y[:-50], tf.float32)
         self.test_data = tf.cast(self.Y[-50:], tf.float32)
         return self.Y
+
+    def setData(self,Y):
+        self.Y = Y
+        self.train_data = tf.cast(self.Y[:-50], tf.float32)
+        self.test_data = tf.cast(self.Y[-50:], tf.float32)
 
     def compile(self):
         self.autoencoder = Autoencoder(self.latent_dim, self.Y.shape[1])
         self.autoencoder.compile(optimizer="adam", loss=losses.MeanSquaredError())
 
-    def fit(self, epochs=50):
+    def fit(self, epochs=100):
+        if self.use_mlflow:
+            mlflow.tensorflow.autolog(every_n_iter=2)
         self.autoencoder.fit(
             self.train_data,
             self.train_data,
             epochs=epochs,
+            batch_size=128,
             shuffle=True,
             validation_data=(self.test_data, self.test_data),
         )
+        if self.use_mlflow:
+            self.visualizeTestData()
+            mlflow.end_run()
 
     def save(self, dir="models"):
         # Save the model, sample and data set
@@ -134,6 +160,9 @@ class Doe2Vec:
         )
         np.save(
             f"{dir}/data_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy", self.Y
+        )
+        np.save(
+            f"{dir}/functions_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy", self.functions
         )
 
     def encode(self, X, return_error=False):
@@ -149,7 +178,7 @@ class Doe2Vec:
     def visualizeTestData(self, n=5):
         encoded_does = self.autoencoder.encoder(self.test_data).numpy()
         decoded_does = self.autoencoder.decoder(encoded_does).numpy()
-        fig = plt.figure(figsize=(n * 5, 10))
+        fig = plt.figure(figsize=(n * 4, 8))
         for i in range(n):
             # display original
             ax = fig.add_subplot(2, n, i + 1, projection="3d")
@@ -194,19 +223,21 @@ class Doe2Vec:
                 line.set_visible(False)
             plt.title("reconstructed")
             plt.gray()
-        plt.show()
+        if self.use_mlflow:
+            plt.savefig("test.png")
+            mlflow.log_artifact("test.png", "img")
+        else:
+            plt.show()
 
 
 if __name__ == "__main__":
-    obj = Doe2Vec(5, 8, n=10000)
-
-    if not obj.load():
+    for d in [2,5,10,20]:
+        obj = Doe2Vec(2, 8, n=100000, latent_dim=8)
+        #if not obj.load():
         obj.generateData()
         obj.compile()
-        obj.fit(50)
-
-    obj.visualizeTestData()
-    #obj.save()
+        obj.fit(100)
+        obj.save()
 """
 TODO:
 - optimize parameters of autoencoder
@@ -214,7 +245,4 @@ TODO:
 - display reconstruction errors.
 - perform for 2-20 dimensions
 - fix seed!
-- Add MLFLOW integration
-    https://medium.com/analytics-vidhya/tensorflow-model-tracking-with-mlflow-e9de29c8e542
-    See also https://github.com/mlflow/mlflow/issues/4982
 """
