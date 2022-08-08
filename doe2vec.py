@@ -248,14 +248,14 @@ class Doe2Vec:
 
 
 if __name__ == "__main__":
-    for d in [2]:
-        for m in [8]:
-            for latent_dim in [8]:
-                obj = Doe2Vec(d, m, n=d*10000, latent_dim=latent_dim)
+    for d in [2,5,10]:
+        for m in [8,9,10]:
+            for latent_dim in [8,16,24]:
+                obj = Doe2Vec(d, m, n=d*50000, latent_dim=latent_dim)
                 #if not obj.load():
                 obj.generateData()
                 obj.compile()
-                obj.fit(50)
+                obj.fit(100)
                 obj.save()
 """
 TODO:
