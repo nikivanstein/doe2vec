@@ -13,6 +13,7 @@ from tensorflow.keras.models import Model
 import mlflow
 from numpy.random import seed
 import mlflow.tensorflow
+from sklearn.neighbors import NearestNeighbors
 
 from modulesRandFunc import generate_exp2fun as genExp2fun
 from modulesRandFunc import generate_tree as genTree
@@ -83,6 +84,7 @@ class Doe2Vec:
             self.test_data = tf.cast(self.Y[-50:], tf.float32)
             print("Loaded pre-existng model and data")
             self.summary()
+            self.fitNN()
             return True
         else:
             return False
@@ -149,9 +151,18 @@ class Doe2Vec:
             shuffle=True,
             validation_data=(self.test_data, self.test_data),
         )
+        self.fitNN()
         if self.use_mlflow:
             self.visualizeTestData()
             mlflow.end_run()
+
+    def fitNN(self):
+        self.encoded_Y = self.encode(self.Y)
+        self.nn = NearestNeighbors(n_neighbors=1, algorithm='ball_tree').fit(self.encoded_Y)
+
+    def getNeighbourFunction(self, features):
+        distances, indices = self.nn.kneighbors(features)
+        return self.functions[indices[0]][0], distances[0]
 
     def save(self, dir="models"):
         # Save the model, sample and data set
@@ -170,9 +181,11 @@ class Doe2Vec:
         )
 
     def encode(self, X, return_error=False):
-        encoded_doe = self.autoencoder.encoder([X]).numpy()
+        X = tf.cast(X, tf.float32)
+        encoded_doe = self.autoencoder.encoder(X).numpy()
         if return_error:
-            decoded_doe = self.autoencoder.decoder([encoded_doe]).numpy()
+            enc = tf.cast(np.array(encoded_doe), tf.float32)
+            decoded_doe = self.autoencoder.decoder(enc).numpy()
             # todo: return reconstruction error
         return encoded_doe
 
@@ -235,9 +248,9 @@ class Doe2Vec:
 
 
 if __name__ == "__main__":
-    for d in [2,5,10,20]:
-        for m in [8,9,10]:
-            for latent_dim in [8,16,32]:
+    for d in [2]:
+        for m in [8]:
+            for latent_dim in [8]:
                 obj = Doe2Vec(d, m, n=d*10000, latent_dim=latent_dim)
                 #if not obj.load():
                 obj.generateData()
