@@ -345,4 +345,3 @@ if __name__ == "__main__":
                     obj.compile()
                     obj.fit(100)
                     obj.save("../models/")
-                obj.autoencoder.push_to_hub(f"doe2vec-d{d}-m{m}-ls{latent_dim}")
