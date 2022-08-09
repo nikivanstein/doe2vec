@@ -5,7 +5,7 @@ import os
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.model_selection import cross_val_score
 from sklearn.metrics import multilabel_confusion_matrix
@@ -37,7 +37,7 @@ def plot_confusion_matrix(y_test,y_scores, classNames, title="confusion_matrix")
 """Classification experiment for BBOB
 """
 
-obj = Doe2Vec(5, 8, n=20000, latent_dim=8, use_mlflow=False)
+obj = Doe2Vec(5, 9, n=20000, latent_dim=16, use_mlflow=False)
 if not obj.load():
     obj.generateData()
     obj.compile()
