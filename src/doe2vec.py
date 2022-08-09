@@ -1,19 +1,21 @@
-import matplotlib.pyplot as plt
-import numpy as np
 import os.path
+
+import matplotlib.pyplot as plt
+import mlflow.tensorflow
+import numpy as np
 import pandas as pd
 import tensorflow as tf
 from matplotlib import cm
 from mpl_toolkits import mplot3d
+from numpy.random import seed
 from scipy.stats import qmc
 from sklearn.metrics import accuracy_score, precision_score, recall_score
 from sklearn.model_selection import train_test_split
+from sklearn.neighbors import NearestNeighbors
 from tensorflow.keras import layers, losses
 from tensorflow.keras.models import Model
-import mlflow
-from numpy.random import seed
-import mlflow.tensorflow
 
+import mlflow
 from modulesRandFunc import generate_exp2fun as genExp2fun
 from modulesRandFunc import generate_tree as genTree
 from modulesRandFunc import generate_tree2exp as genTree2exp
@@ -44,8 +46,30 @@ class Autoencoder(Model):
         return decoded
 
 
-class Doe2Vec:
-    def __init__(self, dim, m, n=1000, latent_dim=32, seed_nr=0, use_mlflow=True, mlflow_name="Doc2Vec"):
+class doe_model:
+    def __init__(
+        self,
+        dim,
+        m,
+        n=1000,
+        latent_dim=16,
+        seed_nr=0,
+        custom_sample=None,
+        use_mlflow=False,
+        mlflow_name="Doc2Vec",
+    ):
+        """Doe2Vec model to transform Design of Experiments to feature vectors.
+
+        Args:
+            dim (int): Number of dimensions of the DOE
+            m (int): Power for number of samples used in the Sobol sampler (not used for custom_sample)
+            n (int, optional): Number of generated functions to use a training data. Defaults to 1000.
+            latent_dim (int, optional): Number of dimensions in the latent space (vector size). Defaults to 16.
+            seed_nr (int, optional): Random seed. Defaults to 0.
+            custom_sample (array, optional): dim-d Array with a custom sample or None to use Sobol sequences. Defaults to None.
+            use_mlflow (bool, optional): To use the mlflow backend to log experiments. Defaults to False.
+            mlflow_name (str, optional): The name to log the mlflow experiment. Defaults to "Doc2Vec".
+        """
         self.dim = dim
         self.m = m
         self.n = n
@@ -53,20 +77,35 @@ class Doe2Vec:
         self.seed = seed_nr
         seed(self.seed)
         # generate the DOE using Sobol
-        self.sampler = qmc.Sobol(d=self.dim, scramble=False, seed=self.seed)
-        self.sample = self.sampler.random_base2(m=self.m)
+        if custom_sample is None:
+            self.sampler = qmc.Sobol(d=self.dim, scramble=False, seed=self.seed)
+            self.sample = self.sampler.random_base2(m=self.m)
+        else:
+            self.sample = custom_sample
         self.use_mlflow = use_mlflow
         if use_mlflow:
             mlflow.set_tracking_uri("mlflow/")
             mlflow.set_experiment(mlflow_name)
-            mlflow.start_run(run_name=f"run {self.dim}-{self.m}-{self.latent_dim}-{self.seed}")
+            mlflow.start_run(
+                run_name=f"run {self.dim}-{self.m}-{self.latent_dim}-{self.seed}"
+            )
             mlflow.log_param("dim", self.dim)
             mlflow.log_param("m", self.m)
             mlflow.log_param("latent_dim", self.latent_dim)
             mlflow.log_param("seed", self.seed)
 
     def load(self, dir="models"):
-        if (os.path.exists(f"{dir}/sample_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy")):
+        """Load a pre-trained Doe2vec model and data.
+
+        Args:
+            dir (str, optional): The directory where the model and data are stored. Defaults to "models".
+
+        Returns:
+            bool: True if loaded, else False.
+        """
+        if os.path.exists(
+            f"{dir}/sample_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy"
+        ):
             self.autoencoder = tf.keras.models.load_model(
                 f"{dir}/model_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}"
             )
@@ -83,14 +122,25 @@ class Doe2Vec:
             self.test_data = tf.cast(self.Y[-50:], tf.float32)
             print("Loaded pre-existng model and data")
             self.summary()
+            self.fitNN()
             return True
         else:
             return False
 
     def getSample(self):
+        """Get the sample DOE used.
+
+        Returns:
+            array: Sample
+        """
         return self.sample
 
     def generateData(self):
+        """Generate the random functions for training the autoencoder.
+
+        Returns:
+            array: array with evaluated random functions on sample.
+        """
         array_x = self.sample  # it is required to be named array_x for the eval
         self.Y = []
         self.functions = []
@@ -129,16 +179,27 @@ class Doe2Vec:
         self.test_data = tf.cast(self.Y[-50:], tf.float32)
         return self.Y
 
-    def setData(self,Y):
+    def setData(self, Y):
+        """Helper function to load the data and split in train validation sets.
+
+        Args:
+            Y (nd array): the data set to use.
+        """
         self.Y = Y
         self.train_data = tf.cast(self.Y[:-50], tf.float32)
         self.test_data = tf.cast(self.Y[-50:], tf.float32)
 
     def compile(self):
+        """Compile the autoencoder architecture."""
         self.autoencoder = Autoencoder(self.latent_dim, self.Y.shape[1])
         self.autoencoder.compile(optimizer="adam", loss=losses.MeanSquaredError())
 
     def fit(self, epochs=100):
+        """Fit the autoencoder model.
+
+        Args:
+            epochs (int, optional): Number of epochs to train. Defaults to 100.
+        """
         if self.use_mlflow:
             mlflow.tensorflow.autolog(every_n_iter=1)
         self.autoencoder.fit(
@@ -149,12 +210,36 @@ class Doe2Vec:
             shuffle=True,
             validation_data=(self.test_data, self.test_data),
         )
+        self.fitNN()
         if self.use_mlflow:
             self.visualizeTestData()
             mlflow.end_run()
 
+    def fitNN(self):
+        """Fit the neirest neighbour tree."""
+        self.encoded_Y = self.encode(self.Y)
+        self.nn = NearestNeighbors(n_neighbors=1, algorithm="ball_tree").fit(
+            self.encoded_Y
+        )
+
+    def getNeighbourFunction(self, features):
+        """Get the closest random generated function depending on a set of features (from another function).
+
+        Args:
+            features (array): Feature vector (given by the encode() function)
+
+        Returns:
+            tuple: random function string, distance
+        """
+        distances, indices = self.nn.kneighbors(features)
+        return self.functions[indices[0]][0], distances[0]
+
     def save(self, dir="models"):
-        # Save the model, sample and data set
+        """Save the model, sample and data set
+
+        Args:
+            dir (str, optional): Directory to store the data. Defaults to "models".
+        """
         self.autoencoder.save(
             f"{dir}/model_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}"
         )
@@ -166,20 +251,33 @@ class Doe2Vec:
             f"{dir}/data_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy", self.Y
         )
         np.save(
-            f"{dir}/functions_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy", self.functions
+            f"{dir}/functions_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy",
+            self.functions,
         )
 
-    def encode(self, X, return_error=False):
-        encoded_doe = self.autoencoder.encoder([X]).numpy()
-        if return_error:
-            decoded_doe = self.autoencoder.decoder([encoded_doe]).numpy()
-            # todo: return reconstruction error
+    def encode(self, X):
+        """Encode a Design of Experiments.
+
+        Args:
+            X (array): The DOE to encode.
+
+        Returns:
+            array: encoded feature vector.
+        """
+        X = tf.cast(X, tf.float32)
+        encoded_doe = self.autoencoder.encoder(X).numpy()
         return encoded_doe
 
     def summary(self):
-        self.autoencoder.summary()
+        """Get a summary of the autoencoder model"""
+        self.autoencoder.encoder.summary()
 
     def visualizeTestData(self, n=5):
+        """Get a visualisation of the validation data.
+
+        Args:
+            n (int, optional): The number of validation DOEs to show. Defaults to 5.
+        """
         encoded_does = self.autoencoder.encoder(self.test_data).numpy()
         decoded_does = self.autoencoder.decoder(encoded_does).numpy()
         fig = plt.figure(figsize=(n * 4, 8))
@@ -235,20 +333,16 @@ class Doe2Vec:
 
 
 if __name__ == "__main__":
-    for d in [2,5,10,20]:
-        for m in [8,9,10]:
-            for latent_dim in [8,16,32]:
-                obj = Doe2Vec(d, m, n=d*10000, latent_dim=latent_dim)
-                #if not obj.load():
-                obj.generateData()
-                obj.compile()
-                obj.fit(50)
-                obj.save()
-"""
-TODO:
-- optimize parameters of autoencoder
-- check bbob functions, to find corresponding random function
-- display reconstruction errors.
-- perform for 2-20 dimensions
-- fix seed!
-"""
+    import os
+
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    for d in [2, 5, 10]:
+        for m in [8, 9, 10]:
+            for latent_dim in [8, 16, 24]:
+                obj = doe_model(d, m, n=d * 50000, latent_dim=latent_dim)
+                if not obj.load("../models/"):
+                    obj.generateData()
+                    obj.compile()
+                    obj.fit(100)
+                    obj.save("../models/")
+                obj.autoencoder.push_to_hub(f"doe2vec-d{d}-m{m}-ls{latent_dim}")
