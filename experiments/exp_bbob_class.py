@@ -1,5 +1,5 @@
-import src.bbobbenchmarks as bbob
-from src.doe2vec import doe_model
+import bbobbenchmarks as bbob
+from doe2vec import doe_model
 import numpy as np
 import os
 from sklearn.tree import DecisionTreeClassifier

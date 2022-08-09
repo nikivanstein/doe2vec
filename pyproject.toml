@@ -1,0 +1,33 @@
+# pyproject.toml
+
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "doe2vec"
+version = "0.6.2"
+description = "Feature extraction for exploratory landscape analysis"
+readme = "README.md"
+authors = [{ name = "Bas van Stein", email = "b.van.stein@liacs.leidenuniv.nl" }]
+license = { file = "LICENSE" }
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+]
+keywords = ["autoencoder", "representation learning", "exploratory landscape analysis"]
+dependencies = [
+    'scikit-learn',
+    'tensorflow',
+    'matplotlib',
+    'mlflow',
+    'pandas'
+]
+requires-python = ">=3.8"
+
+[project.optional-dependencies]
+dev = ["black", "isort", "pip-tools"]
+
+[project.urls]
+Homepage = "https://github.com/Basvanstein/doe2vec"

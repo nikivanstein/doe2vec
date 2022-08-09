@@ -1,5 +1,5 @@
-import src.bbobbenchmarks as bbob
-from src.doe2vec import Doe2Vec
+import bbobbenchmarks as bbob
+from doe2vec import doe_model
 import numpy as np
 import os
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
@@ -65,7 +65,7 @@ def createSurfacePlot(bbob_fun, gen_fun, name="bbobx", title="f_x"):
 
 
 
-obj = Doe2Vec(2, 8, n=1000000, latent_dim=16, use_mlflow=False)
+obj = doe2vec(2, 8, n=1000000, latent_dim=16, use_mlflow=False)
 if not obj.load():
     obj.generateData()
     obj.compile()
