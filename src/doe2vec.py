@@ -14,36 +14,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.neighbors import NearestNeighbors
 from tensorflow.keras import layers, losses
 from tensorflow.keras.models import Model
+from models import Autoencoder, VAE
 
 import mlflow
 from modulesRandFunc import generate_exp2fun as genExp2fun
 from modulesRandFunc import generate_tree as genTree
 from modulesRandFunc import generate_tree2exp as genTree2exp
-
-
-class Autoencoder(Model):
-    def __init__(self, latent_dim, sample_size):
-        super(Autoencoder, self).__init__()
-        self.latent_dim = latent_dim
-        self.encoder = tf.keras.Sequential(
-            [
-                layers.Dense(sample_size / 2, activation="relu"),
-                layers.Dense(sample_size / 4, activation="relu"),
-                layers.Dense(latent_dim, activation="relu"),
-            ]
-        )
-        self.decoder = tf.keras.Sequential(
-            [
-                layers.Dense(sample_size / 4, activation="relu"),
-                layers.Dense(sample_size / 2, activation="relu"),
-                layers.Dense(sample_size, activation="sigmoid"),
-            ]
-        )
-
-    def call(self, x):
-        encoded = self.encoder(x)
-        decoded = self.decoder(encoded)
-        return decoded
 
 
 class doe_model:
@@ -84,7 +60,7 @@ class doe_model:
             self.sample = custom_sample
         self.use_mlflow = use_mlflow
         if use_mlflow:
-            mlflow.set_tracking_uri("mlflow/")
+            mlflow.set_tracking_uri("../mlflow/")
             mlflow.set_experiment(mlflow_name)
             mlflow.start_run(
                 run_name=f"run {self.dim}-{self.m}-{self.latent_dim}-{self.seed}"
@@ -189,10 +165,13 @@ class doe_model:
         self.train_data = tf.cast(self.Y[:-50], tf.float32)
         self.test_data = tf.cast(self.Y[-50:], tf.float32)
 
-    def compile(self):
+    def compile(self, use_VAE = True):
         """Compile the autoencoder architecture."""
-        self.autoencoder = Autoencoder(self.latent_dim, self.Y.shape[1])
-        self.autoencoder.compile(optimizer="adam", loss=losses.MeanSquaredError())
+        if use_VAE:
+            self.autoencoder = VAE(self.latent_dim, self.Y.shape[1]) #
+        else:
+            self.autoencoder = Autoencoder(self.latent_dim, self.Y.shape[1])
+        self.autoencoder.compile(optimizer="adam") #, loss=losses.MeanSquaredError()
 
     def fit(self, epochs=100):
         """Fit the autoencoder model.
@@ -208,7 +187,7 @@ class doe_model:
             epochs=epochs,
             batch_size=128,
             shuffle=True,
-            validation_data=(self.test_data, self.test_data),
+            validation_data=(self.test_data,self.test_data)
         )
         self.fitNN()
         if self.use_mlflow:
@@ -265,7 +244,7 @@ class doe_model:
             array: encoded feature vector.
         """
         X = tf.cast(X, tf.float32)
-        encoded_doe = self.autoencoder.encoder(X).numpy()
+        z_mean, z_log_var, encoded_doe = self.autoencoder.encoder(X)
         return encoded_doe
 
     def summary(self):
@@ -278,7 +257,7 @@ class doe_model:
         Args:
             n (int, optional): The number of validation DOEs to show. Defaults to 5.
         """
-        encoded_does = self.autoencoder.encoder(self.test_data).numpy()
+        z_mean, z_log_var, encoded_does = self.autoencoder.encoder(self.test_data).numpy()
         decoded_does = self.autoencoder.decoder(encoded_does).numpy()
         fig = plt.figure(figsize=(n * 4, 8))
         for i in range(n):
@@ -336,12 +315,12 @@ if __name__ == "__main__":
     import os
 
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-    for d in [2, 5, 10]:
-        for m in [8, 9, 10]:
-            for latent_dim in [8, 16, 24]:
-                obj = doe_model(d, m, n=d * 50000, latent_dim=latent_dim)
-                if not obj.load("../models/"):
-                    obj.generateData()
-                    obj.compile()
-                    obj.fit(100)
-                    obj.save("../models/")
+    for d in [2,5,10]:
+        for m in [8]:
+            for latent_dim in [16]:
+                obj = doe_model(d, m, n=d * 50000, latent_dim=latent_dim, use_mlflow=True, mlflow_name="VAE")
+                #if not obj.load("../models/"):
+                obj.generateData()
+                obj.compile()
+                obj.fit(100)
+                obj.save("../models/")
