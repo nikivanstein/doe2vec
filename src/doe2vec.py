@@ -12,9 +12,11 @@ from scipy.stats import qmc
 from sklearn.metrics import accuracy_score, precision_score, recall_score
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import NearestNeighbors
+from sklearn import manifold
 from tensorflow.keras import layers, losses
 from tensorflow.keras.models import Model
 from models import Autoencoder, VAE
+import bbobbenchmarks as bbob
 
 import mlflow
 from modulesRandFunc import generate_exp2fun as genExp2fun
@@ -213,6 +215,7 @@ class doe_model:
             )
         self.fitNN()
         if self.use_mlflow:
+            self.plot_label_clusters_bbob()
             self.visualizeTestData()
             mlflow.end_run()
 
@@ -277,14 +280,40 @@ class doe_model:
         """Get a summary of the autoencoder model"""
         self.autoencoder.encoder.summary()
 
-    def plot_label_clusters(self, data, labels):
+    def plot_label_clusters_bbob(self):
+        encodings = []
+        fuction_groups = []
+        for f in range(1,25):
+            for i in range(100):
+                fun, opt = bbob.instantiate(f,i)
+                bbob_y =  np.asarray(list(map(fun, self.sample)))
+                array_x = (bbob_y.flatten() - np.min(bbob_y)) / (
+                            np.max(bbob_y) - np.min(bbob_y)
+                        )
+                encoded = self.encode([array_x])
+                encodings.append(encoded[0])
+                fuction_groups.append(f)
+
+        X = np.array(encodings)
+        y = np.array(fuction_groups).flatten()
+
+        z_mean, _, _ = self.encoder.predict(X)
+        t_sne = manifold.TSNE(
+            n_components=2,
+            learning_rate="auto",
+            perplexity=30,
+            n_iter=250,
+            init="random",
+            random_state=self.seed,
+        )
+        S_t_sne = t_sne.fit_transform(z_mean)
         # display a 2D plot of the digit classes in the latent space
-        z_mean, _, _ = self.encoder.predict(data)
+        
         plt.figure(figsize=(12, 10))
-        plt.scatter(z_mean[:, 0], z_mean[:, 1], c=labels)
+        plt.scatter(S_t_sne[:, 0], S_t_sne[:, 1], c=y)
         plt.colorbar()
-        plt.xlabel("z[0]")
-        plt.ylabel("z[1]")
+        plt.xlabel("")
+        plt.ylabel("")
 
         if self.use_mlflow:
             plt.savefig("latent_space.png")
@@ -368,14 +397,14 @@ if __name__ == "__main__":
     for d in [2]:
         for m in [8]:
             for latent_dim in [4,8,16,24,32]:
-                for model_type in ["AE", "VAE"]:
+                for model_type in ["VAE", "AE"]:
                     if model_type == "VAE":
                         for weight in [0.001,0.05,0.1,0.2,0.5]:
-                            obj = doe_model(d, m, n=d * 50000, latent_dim=latent_dim, kl_weight=weight, use_mlflow=True, mlflow_name="big-exp2d",model_type=model_type)
+                            obj = doe_model(d, m, n=d * 5000, latent_dim=latent_dim, kl_weight=weight, use_mlflow=True, mlflow_name="big-exp2d",model_type=model_type)
                             #if not obj.load("../models/"):
                             obj.generateData()
                             obj.compile()
-                            obj.fit(50)
+                            obj.fit(10)
                     else:
                         obj = doe_model(d, m, n=d * 50000, latent_dim=latent_dim, kl_weight=weight, use_mlflow=True, mlflow_name="big-exp2d",model_type=model_type)
                         #if not obj.load("../models/"):
