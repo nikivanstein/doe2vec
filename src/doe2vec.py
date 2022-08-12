@@ -33,6 +33,7 @@ class doe_model:
         custom_sample=None,
         use_mlflow=False,
         mlflow_name="Doc2Vec",
+        model_type = "VAE"
     ):
         """Doe2Vec model to transform Design of Experiments to feature vectors.
 
@@ -45,12 +46,16 @@ class doe_model:
             custom_sample (array, optional): dim-d Array with a custom sample or None to use Sobol sequences. Defaults to None.
             use_mlflow (bool, optional): To use the mlflow backend to log experiments. Defaults to False.
             mlflow_name (str, optional): The name to log the mlflow experiment. Defaults to "Doc2Vec".
+            model_type (str, optional): The model to use, either "Autoencoder" or "VAE". Defaults to "VAE".
         """
         self.dim = dim
         self.m = m
         self.n = n
         self.latent_dim = latent_dim
         self.seed = seed_nr
+        self.use_VAE = False
+        if model_type == "VAE":
+            self.use_VAE = True
         seed(self.seed)
         # generate the DOE using Sobol
         if custom_sample is None:
@@ -165,9 +170,9 @@ class doe_model:
         self.train_data = tf.cast(self.Y[:-50], tf.float32)
         self.test_data = tf.cast(self.Y[-50:], tf.float32)
 
-    def compile(self, use_VAE = True):
+    def compile(self):
         """Compile the autoencoder architecture."""
-        if use_VAE:
+        if self.use_VAE:
             self.autoencoder = VAE(self.latent_dim, self.Y.shape[1]) #
         else:
             self.autoencoder = Autoencoder(self.latent_dim, self.Y.shape[1])
@@ -244,7 +249,11 @@ class doe_model:
             array: encoded feature vector.
         """
         X = tf.cast(X, tf.float32)
-        z_mean, z_log_var, encoded_doe = self.autoencoder.encoder(X)
+        if self.use_VAE:
+            _, __, encoded_doe = self.autoencoder.encoder(X)
+            encoded_doe = np.array(encoded_doe)
+        else:
+            encoded_doe = self.autoencoder.encoder(X).numpy()
         return encoded_doe
 
     def summary(self):
@@ -257,7 +266,10 @@ class doe_model:
         Args:
             n (int, optional): The number of validation DOEs to show. Defaults to 5.
         """
-        z_mean, z_log_var, encoded_does = self.autoencoder.encoder(self.test_data).numpy()
+        if self.use_VAE:
+            _z_mean, _z_log_var, encoded_does = self.autoencoder.encoder(self.test_data)
+        else:
+            encoded_does = self.autoencoder.encoder(self.test_data).numpy()
         decoded_does = self.autoencoder.decoder(encoded_does).numpy()
         fig = plt.figure(figsize=(n * 4, 8))
         for i in range(n):
@@ -315,10 +327,10 @@ if __name__ == "__main__":
     import os
 
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-    for d in [2,5,10]:
+    for d in [2,5,10,20]:
         for m in [8]:
-            for latent_dim in [16]:
-                obj = doe_model(d, m, n=d * 50000, latent_dim=latent_dim, use_mlflow=True, mlflow_name="VAE")
+            for latent_dim in [8,16,24,32]:
+                obj = doe_model(d, m, n=d * 50000, latent_dim=latent_dim, use_mlflow=True, mlflow_name="VAE-mse")
                 #if not obj.load("../models/"):
                 obj.generateData()
                 obj.compile()

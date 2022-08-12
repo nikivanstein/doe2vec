@@ -77,9 +77,9 @@ class VAE(Model):
         return decoder
 
 
-    def call(self, x):
-        z_mean, z_log_var, z = self.encoder(x)
-        decoded = self.decoder(z)
+    def call(self, x, training=False):
+        z_mean, z_log_var, z = self.encoder(x, training=training)
+        decoded = self.decoder(z, training=training)
         return z_mean, z_log_var, z, decoded
 
     @property
@@ -93,12 +93,12 @@ class VAE(Model):
     def train_step(self, data):
         x, y = data
         with tf.GradientTape() as tape:
-            z_mean, z_log_var, z, reconstruction = self(x)
-            reconstruction_loss = tf.reduce_sum(
-                    tf.keras.losses.binary_crossentropy(y, reconstruction) # or use MeanSquaredError?
-                )
+            z_mean, z_log_var, z = self.encoder(x, training=True)
+            reconstruction = self.decoder(z, training=True)
+            squared_error = tf.square(y - reconstruction)
+            reconstruction_loss = tf.reduce_mean(squared_error) #MeanSquaredError
             kl_loss = -0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
-            kl_loss = tf.reduce_sum(kl_loss)
+            kl_loss = tf.reduce_mean(kl_loss)
             total_loss = reconstruction_loss + kl_loss
         grads = tape.gradient(total_loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
@@ -114,9 +114,8 @@ class VAE(Model):
     def test_step(self, data):
         d, v = data
         z_mean, z_log_var, z, reconstruction = self(d)
-        reconstruction_loss = tf.reduce_sum(
-                tf.keras.losses.binary_crossentropy(v, reconstruction) # or use MeanSquaredError?
-            )
+        squared_error = tf.square(v - reconstruction)
+        reconstruction_loss = tf.reduce_mean(squared_error) #MeanSquaredError
         kl_loss = -0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
         kl_loss = tf.reduce_sum(kl_loss)
         total_loss = reconstruction_loss + kl_loss
