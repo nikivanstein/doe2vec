@@ -48,7 +48,7 @@ class doe_model:
             custom_sample (array, optional): dim-d Array with a custom sample or None to use Sobol sequences. Defaults to None.
             use_mlflow (bool, optional): To use the mlflow backend to log experiments. Defaults to False.
             mlflow_name (str, optional): The name to log the mlflow experiment. Defaults to "Doc2Vec".
-            model_type (str, optional): The model to use, either "Autoencoder" or "VAE". Defaults to "VAE".
+            model_type (str, optional): The model to use, either "AE" or "VAE". Defaults to "VAE".
         """
         self.dim = dim
         self.m = m
@@ -57,8 +57,10 @@ class doe_model:
         self.latent_dim = latent_dim
         self.seed = seed_nr
         self.use_VAE = False
+        self.model_type = model_type
         if model_type == "VAE":
             self.use_VAE = True
+            self.model_type = self.model_type + str(kl_weight)
         seed(self.seed)
         # generate the DOE using Sobol
         if custom_sample is None:
@@ -73,6 +75,7 @@ class doe_model:
             mlflow.start_run(
                 run_name=f"run {self.dim}-{self.m}-{self.latent_dim}-{self.seed}"
             )
+            mlflow.log_param("model_type", model_type)
             mlflow.log_param("dim", self.dim)
             mlflow.log_param("kl_weight", self.kl_weight)
             mlflow.log_param("m", self.m)
@@ -89,19 +92,19 @@ class doe_model:
             bool: True if loaded, else False.
         """
         if os.path.exists(
-            f"{dir}/sample_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy"
+            f"{dir}/sample_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}.npy"
         ):
             self.autoencoder = tf.keras.models.load_model(
-                f"{dir}/model_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}"
+                f"{dir}/model_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}"
             )
             self.sample = np.load(
-                f"{dir}/sample_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy"
+                f"{dir}/sample_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}.npy"
             )
             self.Y = np.load(
-                f"{dir}/data_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy"
+                f"{dir}/data_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}.npy"
             )
             self.functions = np.load(
-                f"{dir}/functions_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy"
+                f"{dir}/functions_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}.npy"
             )
             self.train_data = tf.cast(self.Y[:-50], tf.float32)
             self.test_data = tf.cast(self.Y[-50:], tf.float32)
@@ -239,17 +242,17 @@ class doe_model:
             dir (str, optional): Directory to store the data. Defaults to "models".
         """
         self.autoencoder.save(
-            f"{dir}/model_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}"
+            f"{dir}/model_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}"
         )
         np.save(
-            f"{dir}/sample_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy",
+            f"{dir}/sample_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}.npy",
             self.sample,
         )
         np.save(
-            f"{dir}/data_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy", self.Y
+            f"{dir}/data_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}.npy", self.Y
         )
         np.save(
-            f"{dir}/functions_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}.npy",
+            f"{dir}/functions_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}.npy",
             self.functions,
         )
 
@@ -273,6 +276,27 @@ class doe_model:
     def summary(self):
         """Get a summary of the autoencoder model"""
         self.autoencoder.encoder.summary()
+
+    def plot_label_clusters(self, data, labels):
+        # display a 2D plot of the digit classes in the latent space
+        z_mean, _, _ = self.encoder.predict(data)
+        plt.figure(figsize=(12, 10))
+        plt.scatter(z_mean[:, 0], z_mean[:, 1], c=labels)
+        plt.colorbar()
+        plt.xlabel("z[0]")
+        plt.ylabel("z[1]")
+
+        if self.use_mlflow:
+            plt.savefig("latent_space.png")
+            mlflow.log_artifact("latent_space.png", "img")
+        else:
+            plt.show()
+
+
+#(x_train, y_train), _ = keras.datasets.mnist.load_data()
+#x_train = np.expand_dims(x_train, -1).astype("float32") / 255
+
+#plot_label_clusters(vae, x_train, y_train)
 
     def visualizeTestData(self, n=5):
         """Get a visualisation of the validation data.
@@ -331,8 +355,8 @@ class doe_model:
             plt.title("reconstructed")
             plt.gray()
         if self.use_mlflow:
-            plt.savefig("test.png")
-            mlflow.log_artifact("test.png", "img")
+            plt.savefig("reconstruction.png")
+            mlflow.log_artifact("reconstruction.png", "img")
         else:
             plt.show()
 
@@ -341,13 +365,21 @@ if __name__ == "__main__":
     import os
 
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-    for d in [2,5,10,20]:
-        for m in [8,9]:
+    for d in [2]:
+        for m in [8]:
             for latent_dim in [4,8,16,24,32]:
-                for weight in [0.05,0.1,0.2,0.5]:
-                    obj = doe_model(d, m, n=d * 50000, latent_dim=latent_dim, kl_weight=weight, use_mlflow=True, mlflow_name="VAE-mse3")
-                    #if not obj.load("../models/"):
-                    obj.generateData()
-                    obj.compile()
-                    obj.fit(100)
-                #obj.save("../models/")
+                for model_type in ["AE", "VAE"]:
+                    if model_type == "VAE":
+                        for weight in [0.001,0.05,0.1,0.2,0.5]:
+                            obj = doe_model(d, m, n=d * 50000, latent_dim=latent_dim, kl_weight=weight, use_mlflow=True, mlflow_name="big-exp2d",model_type=model_type)
+                            #if not obj.load("../models/"):
+                            obj.generateData()
+                            obj.compile()
+                            obj.fit(50)
+                    else:
+                        obj = doe_model(d, m, n=d * 50000, latent_dim=latent_dim, kl_weight=weight, use_mlflow=True, mlflow_name="big-exp2d",model_type=model_type)
+                        #if not obj.load("../models/"):
+                        obj.generateData()
+                        obj.compile()
+                        obj.fit(50)
+            #obj.save("../models/")
