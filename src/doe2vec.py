@@ -30,6 +30,7 @@ class doe_model:
         n=1000,
         latent_dim=16,
         seed_nr=0,
+        kl_weight = 0.1,
         custom_sample=None,
         use_mlflow=False,
         mlflow_name="Doc2Vec",
@@ -43,6 +44,7 @@ class doe_model:
             n (int, optional): Number of generated functions to use a training data. Defaults to 1000.
             latent_dim (int, optional): Number of dimensions in the latent space (vector size). Defaults to 16.
             seed_nr (int, optional): Random seed. Defaults to 0.
+            kl_weight (float, optional): Defaults to 0.1.
             custom_sample (array, optional): dim-d Array with a custom sample or None to use Sobol sequences. Defaults to None.
             use_mlflow (bool, optional): To use the mlflow backend to log experiments. Defaults to False.
             mlflow_name (str, optional): The name to log the mlflow experiment. Defaults to "Doc2Vec".
@@ -51,6 +53,7 @@ class doe_model:
         self.dim = dim
         self.m = m
         self.n = n
+        self.kl_weight = kl_weight
         self.latent_dim = latent_dim
         self.seed = seed_nr
         self.use_VAE = False
@@ -71,6 +74,7 @@ class doe_model:
                 run_name=f"run {self.dim}-{self.m}-{self.latent_dim}-{self.seed}"
             )
             mlflow.log_param("dim", self.dim)
+            mlflow.log_param("kl_weight", self.kl_weight)
             mlflow.log_param("m", self.m)
             mlflow.log_param("latent_dim", self.latent_dim)
             mlflow.log_param("seed", self.seed)
@@ -173,10 +177,11 @@ class doe_model:
     def compile(self):
         """Compile the autoencoder architecture."""
         if self.use_VAE:
-            self.autoencoder = VAE(self.latent_dim, self.Y.shape[1]) #
+            self.autoencoder = VAE(self.latent_dim, self.Y.shape[1], kl_weight=self.kl_weight)
+            self.autoencoder.compile(optimizer="adam")
         else:
             self.autoencoder = Autoencoder(self.latent_dim, self.Y.shape[1])
-        self.autoencoder.compile(optimizer="adam") #, loss=losses.MeanSquaredError()
+            self.autoencoder.compile(optimizer="adam", loss=losses.MeanSquaredError())
 
     def fit(self, epochs=100):
         """Fit the autoencoder model.
@@ -186,14 +191,23 @@ class doe_model:
         """
         if self.use_mlflow:
             mlflow.tensorflow.autolog(every_n_iter=1)
-        self.autoencoder.fit(
-            self.train_data,
-            self.train_data,
-            epochs=epochs,
-            batch_size=128,
-            shuffle=True,
-            validation_data=(self.test_data,self.test_data)
-        )
+        if self.use_VAE:
+            self.autoencoder.fit(
+                self.train_data,
+                epochs=epochs,
+                batch_size=128,
+                shuffle=True,
+                validation_data=(self.test_data,self.test_data)
+            )
+        else:
+            self.autoencoder.fit(
+                self.train_data,
+                self.train_data,
+                epochs=epochs,
+                batch_size=128,
+                shuffle=True,
+                validation_data=(self.test_data,self.test_data)
+            )
         self.fitNN()
         if self.use_mlflow:
             self.visualizeTestData()
@@ -250,7 +264,7 @@ class doe_model:
         """
         X = tf.cast(X, tf.float32)
         if self.use_VAE:
-            _, __, encoded_doe = self.autoencoder.encoder(X)
+            encoded_doe, _, __ = self.autoencoder.encoder(X)
             encoded_doe = np.array(encoded_doe)
         else:
             encoded_doe = self.autoencoder.encoder(X).numpy()
@@ -267,7 +281,7 @@ class doe_model:
             n (int, optional): The number of validation DOEs to show. Defaults to 5.
         """
         if self.use_VAE:
-            _z_mean, _z_log_var, encoded_does = self.autoencoder.encoder(self.test_data)
+            encoded_does, _z_log_var, _z = self.autoencoder.encoder(self.test_data)
         else:
             encoded_does = self.autoencoder.encoder(self.test_data).numpy()
         decoded_does = self.autoencoder.decoder(encoded_does).numpy()
@@ -328,11 +342,12 @@ if __name__ == "__main__":
 
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     for d in [2,5,10,20]:
-        for m in [8]:
-            for latent_dim in [8,16,24,32]:
-                obj = doe_model(d, m, n=d * 50000, latent_dim=latent_dim, use_mlflow=True, mlflow_name="VAE-mse")
-                #if not obj.load("../models/"):
-                obj.generateData()
-                obj.compile()
-                obj.fit(100)
-                obj.save("../models/")
+        for m in [8,9]:
+            for latent_dim in [4,8,16,24,32]:
+                for weight in [0.05,0.1,0.2,0.5]:
+                    obj = doe_model(d, m, n=d * 50000, latent_dim=latent_dim, kl_weight=weight, use_mlflow=True, mlflow_name="VAE-mse3")
+                    #if not obj.load("../models/"):
+                    obj.generateData()
+                    obj.compile()
+                    obj.fit(100)
+                #obj.save("../models/")
