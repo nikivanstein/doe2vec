@@ -1,7 +1,9 @@
 from random import sample
+
 import tensorflow as tf
 from tensorflow.keras import layers, losses
 from tensorflow.keras.models import Model
+
 
 class Autoencoder(Model):
     def __init__(self, latent_dim, sample_size):
@@ -27,6 +29,7 @@ class Autoencoder(Model):
         decoded = self.decoder(encoded)
         return decoded
 
+
 class Sampling(layers.Layer):
     """Uses (z_mean, z_log_var) to sample z, the vector encoding a DOE."""
 
@@ -37,12 +40,14 @@ class Sampling(layers.Layer):
         epsilon = tf.keras.backend.random_normal(shape=(batch, dim))
         return z_mean + tf.exp(0.5 * z_log_var) * epsilon
 
+
 class VAE(Model):
     """Variational autoencoder
 
     Args:
         keras (_type_): _description_
     """
+
     def __init__(self, latent_dim, sample_size, kl_weight=0.1):
         super(VAE, self).__init__()
         self.latent_dim = latent_dim
@@ -66,8 +71,7 @@ class VAE(Model):
         encoder = tf.keras.Model(encoder_inputs, [z_mean, z_log_var, z], name="encoder")
         encoder.summary()
         return encoder
-        
-    
+
     def _decoder(self):
         latent_inputs = tf.keras.Input(shape=(self.latent_dim,))
         x = layers.Dense(self.sample_size / 4, activation="relu")(latent_inputs)
@@ -76,7 +80,6 @@ class VAE(Model):
         decoder = tf.keras.Model(latent_inputs, decoder_outputs, name="decoder")
         decoder.summary()
         return decoder
-
 
     def call(self, x, training=False):
         z_mean, z_log_var, z = self.encoder(x, training=training)
@@ -94,10 +97,12 @@ class VAE(Model):
     def train_step(self, data):
         with tf.GradientTape() as tape:
             z_mean, z_log_var, z, reconstruction = self(data, training=True)
-            reconstruction_loss = tf.reduce_mean(tf.square(data - reconstruction)) #MeanSquaredError
+            reconstruction_loss = tf.reduce_mean(
+                tf.square(data - reconstruction)
+            )  # MeanSquaredError
             kl_loss = -0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
             kl_loss = tf.reduce_mean(kl_loss)
-            total_loss = reconstruction_loss + self.kl_weight*kl_loss
+            total_loss = reconstruction_loss + self.kl_weight * kl_loss
         grads = tape.gradient(total_loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
         self.total_loss_tracker.update_state(total_loss)
@@ -112,7 +117,9 @@ class VAE(Model):
     def test_step(self, data):
         d, v = data
         z_mean, z_log_var, z, reconstruction = self(d)
-        reconstruction_loss = tf.reduce_mean(tf.square(d - reconstruction)) #MeanSquaredError
+        reconstruction_loss = tf.reduce_mean(
+            tf.square(d - reconstruction)
+        )  # MeanSquaredError
         kl_loss = -0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
         kl_loss = tf.reduce_mean(kl_loss)
         total_loss = reconstruction_loss + self.kl_weight * kl_loss

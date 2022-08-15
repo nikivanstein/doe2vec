@@ -1,6 +1,7 @@
 import os.path
 
 import matplotlib.pyplot as plt
+import mlflow
 import mlflow.tensorflow
 import numpy as np
 import pandas as pd
@@ -9,16 +10,15 @@ from matplotlib import cm
 from mpl_toolkits import mplot3d
 from numpy.random import seed
 from scipy.stats import qmc
+from sklearn import manifold
 from sklearn.metrics import accuracy_score, precision_score, recall_score
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import NearestNeighbors
-from sklearn import manifold
 from tensorflow.keras import layers, losses
 from tensorflow.keras.models import Model
-from models import Autoencoder, VAE
-import bbobbenchmarks as bbob
 
-import mlflow
+import bbobbenchmarks as bbob
+from models import VAE, Autoencoder
 from modulesRandFunc import generate_exp2fun as genExp2fun
 from modulesRandFunc import generate_tree as genTree
 from modulesRandFunc import generate_tree2exp as genTree2exp
@@ -32,11 +32,11 @@ class doe_model:
         n=1000,
         latent_dim=16,
         seed_nr=0,
-        kl_weight = 0.1,
+        kl_weight=0.1,
         custom_sample=None,
         use_mlflow=False,
         mlflow_name="Doc2Vec",
-        model_type = "VAE"
+        model_type="VAE",
     ):
         """Doe2Vec model to transform Design of Experiments to feature vectors.
 
@@ -182,7 +182,9 @@ class doe_model:
     def compile(self):
         """Compile the autoencoder architecture."""
         if self.use_VAE:
-            self.autoencoder = VAE(self.latent_dim, self.Y.shape[1], kl_weight=self.kl_weight)
+            self.autoencoder = VAE(
+                self.latent_dim, self.Y.shape[1], kl_weight=self.kl_weight
+            )
             self.autoencoder.compile(optimizer="adam")
         else:
             self.autoencoder = Autoencoder(self.latent_dim, self.Y.shape[1])
@@ -202,7 +204,7 @@ class doe_model:
                 epochs=epochs,
                 batch_size=128,
                 shuffle=True,
-                validation_data=(self.test_data,self.test_data)
+                validation_data=(self.test_data, self.test_data),
             )
         else:
             self.autoencoder.fit(
@@ -211,7 +213,7 @@ class doe_model:
                 epochs=epochs,
                 batch_size=128,
                 shuffle=True,
-                validation_data=(self.test_data,self.test_data)
+                validation_data=(self.test_data, self.test_data),
             )
         self.fitNN()
         if self.use_mlflow:
@@ -252,7 +254,8 @@ class doe_model:
             self.sample,
         )
         np.save(
-            f"{dir}/data_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}.npy", self.Y
+            f"{dir}/data_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}.npy",
+            self.Y,
         )
         np.save(
             f"{dir}/functions_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}.npy",
@@ -283,26 +286,26 @@ class doe_model:
     def plot_label_clusters_bbob(self):
         encodings = []
         fuction_groups = []
-        for f in range(1,25):
-            for i in range(20):
-                fun, opt = bbob.instantiate(f,i)
-                bbob_y =  np.asarray(list(map(fun, self.sample)))
+        for f in range(1, 25):
+            for i in range(100):
+                fun, opt = bbob.instantiate(f, i)
+                bbob_y = np.asarray(list(map(fun, self.sample)))
                 array_x = (bbob_y.flatten() - np.min(bbob_y)) / (
-                            np.max(bbob_y) - np.min(bbob_y)
-                        )
+                    np.max(bbob_y) - np.min(bbob_y)
+                )
                 encoded = self.encode([array_x])
                 encodings.append(encoded[0])
                 class_label = 0
-                if (f in [1,2,3,4,5]):
-                    class_label = 1#"separable"
-                elif (f in [6,7,8,9]):
-                    class_label = 2#"low cond."
-                elif (f in [10,11,12,13,14]):
-                    class_label = 3#"high cond."
-                elif (f in [15,16,17,18,19]):
-                    class_label = 4#"multi modal gl."
-                elif (f in [20,21,22,23,24]):
-                    class_label = 5#"multi modal"
+                if f in [1, 2, 3, 4, 5]:
+                    class_label = 1  # "separable"
+                elif f in [6, 7, 8, 9]:
+                    class_label = 2  # "low cond."
+                elif f in [10, 11, 12, 13, 14]:
+                    class_label = 3  # "high cond."
+                elif f in [15, 16, 17, 18, 19]:
+                    class_label = 4  # "multi modal gl."
+                elif f in [20, 21, 22, 23, 24]:
+                    class_label = 5  # "multi modal"
 
                 fuction_groups.append(class_label)
 
@@ -314,7 +317,7 @@ class doe_model:
         )
         embedding = mds.fit_transform(X).T
         # display a 2D plot of the bbob functions in the latent space
-        
+
         plt.figure(figsize=(12, 10))
         plt.scatter(embedding[0], embedding[1], c=y, cmap=cm.jet)
         plt.colorbar()
@@ -325,9 +328,9 @@ class doe_model:
             plt.savefig("latent_space.png")
             mlflow.log_artifact("latent_space.png", "img")
         else:
-            plt.savefig(f"../mds/plot_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}.png")
-
-
+            plt.savefig(
+                f"../mds/plot_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}.png"
+            )
 
     def visualizeTestData(self, n=5):
         """Get a visualisation of the validation data.
@@ -398,11 +401,20 @@ if __name__ == "__main__":
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     for d in [2]:
         for m in [8]:
-            for latent_dim in [4,8,16,24,32]:
+            for latent_dim in [4, 8, 16, 24, 32]:
                 for model_type in ["VAE", "AE"]:
                     if model_type == "VAE":
                         for weight in [0.0001, 0.0005, 0.001, 0.005, 0.01]:
-                            obj = doe_model(d, m, n=d * 50000, latent_dim=latent_dim, kl_weight=weight, use_mlflow=False, mlflow_name="big-exp2d",model_type=model_type)
+                            obj = doe_model(
+                                d,
+                                m,
+                                n=d * 50000,
+                                latent_dim=latent_dim,
+                                kl_weight=weight,
+                                use_mlflow=False,
+                                mlflow_name="big-exp2d",
+                                model_type=model_type,
+                            )
                             if not obj.load("../models/"):
                                 obj.generateData()
                                 obj.compile()
@@ -411,7 +423,15 @@ if __name__ == "__main__":
                             else:
                                 obj.plot_label_clusters_bbob()
                     else:
-                        obj = doe_model(d, m, n=d * 50000, latent_dim=latent_dim, use_mlflow=False, mlflow_name="big-exp2d",model_type=model_type)
+                        obj = doe_model(
+                            d,
+                            m,
+                            n=d * 50000,
+                            latent_dim=latent_dim,
+                            use_mlflow=False,
+                            mlflow_name="big-exp2d",
+                            model_type=model_type,
+                        )
                         if not obj.load("../models/"):
                             obj.generateData()
                             obj.compile()
