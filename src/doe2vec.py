@@ -72,7 +72,7 @@ class doe_model:
             self.sample = custom_sample
         self.use_mlflow = use_mlflow
         if use_mlflow:
-            mlflow.set_tracking_uri("../mlflow/")
+            mlflow.set_tracking_uri("../mlruns/")
             mlflow.set_experiment(mlflow_name)
             mlflow.start_run(
                 run_name=f"run {self.dim}-{self.m}-{self.latent_dim}-{self.seed}"
@@ -399,7 +399,7 @@ if __name__ == "__main__":
     import os
 
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-    for d in [2]:
+    for d in [5,10]:
         for m in [8]:
             for latent_dim in [4, 8, 16, 24, 32]:
                 for model_type in ["VAE", "AE"]:
@@ -411,8 +411,8 @@ if __name__ == "__main__":
                                 n=d * 50000,
                                 latent_dim=latent_dim,
                                 kl_weight=weight,
-                                use_mlflow=False,
-                                mlflow_name="big-exp2d",
+                                use_mlflow=True,
+                                mlflow_name="big-exp-5-10d",
                                 model_type=model_type,
                             )
                             if not obj.load("../models/"):
@@ -428,8 +428,8 @@ if __name__ == "__main__":
                             m,
                             n=d * 50000,
                             latent_dim=latent_dim,
-                            use_mlflow=False,
-                            mlflow_name="big-exp2d",
+                            use_mlflow=True,
+                            mlflow_name="big-exp-5-10d",
                             model_type=model_type,
                         )
                         if not obj.load("../models/"):
