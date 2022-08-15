@@ -399,7 +399,7 @@ if __name__ == "__main__":
     import os
 
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-    for d in [5,10]:
+    for d in [5, 10]:
         for m in [8]:
             for latent_dim in [4, 8, 16, 24, 32]:
                 for model_type in ["VAE", "AE"]:
