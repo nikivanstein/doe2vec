@@ -7,8 +7,17 @@ Or to classify optimization landscapes in function groups.
 The approach uses randomly generated functions and can also be used to find a "cheap" reference function given a DOE.
 The model uses Sobol sequences as the default sampling method. A custom sampling method can also be used.
 Both the samples and the landscape should be scaled between 0 and 1.
+
+
+## Install package via pip
+
+`pip install doe2vec`
+
+Afterwards you can use the package via:
+
+`from doe2vec import doe_model`
  
-## How to Setup your Environment
+## How to Setup your Environment for Development
 
 - `python3.8 -m venv env` 
 - `source ./env/bin/activate`

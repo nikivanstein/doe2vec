@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "doe2vec"
-version = "0.6.2"
+version = "0.6.3"
 description = "Feature extraction for exploratory landscape analysis"
 readme = "README.md"
 authors = [{ name = "Bas van Stein", email = "b.van.stein@liacs.leidenuniv.nl" }]
