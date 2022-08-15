@@ -292,24 +292,31 @@ class doe_model:
                         )
                 encoded = self.encode([array_x])
                 encodings.append(encoded[0])
-                fuction_groups.append(f)
+                class_label = 0
+                if (f in [1,2,3,4,5]):
+                    class_label = 1#"separable"
+                elif (f in [6,7,8,9]):
+                    class_label = 2#"low cond."
+                elif (f in [10,11,12,13,14]):
+                    class_label = 3#"high cond."
+                elif (f in [15,16,17,18,19]):
+                    class_label = 4#"multi modal gl."
+                elif (f in [20,21,22,23,24]):
+                    class_label = 5#"multi modal"
+
+                fuction_groups.append(class_label)
 
         X = np.array(encodings)
         y = np.array(fuction_groups).flatten()
-
-        t_sne = manifold.TSNE(
+        mds = manifold.MDS(
             n_components=2,
-            learning_rate="auto",
-            perplexity=30,
-            n_iter=250,
-            init="random",
             random_state=self.seed,
         )
-        S_t_sne = t_sne.fit_transform(X)
+        embedding = mds.fit_transform(X).T
         # display a 2D plot of the bbob functions in the latent space
         
         plt.figure(figsize=(12, 10))
-        plt.scatter(S_t_sne[:, 0], S_t_sne[:, 1], c=y, cmap=cm.jet)
+        plt.scatter(embedding[0], embedding[1], c=y, cmap=cm.jet)
         plt.colorbar()
         plt.xlabel("")
         plt.ylabel("")
@@ -318,13 +325,9 @@ class doe_model:
             plt.savefig("latent_space.png")
             mlflow.log_artifact("latent_space.png", "img")
         else:
-            plt.show()
+            plt.savefig(f"../mds/plot_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}.png")
 
 
-#(x_train, y_train), _ = keras.datasets.mnist.load_data()
-#x_train = np.expand_dims(x_train, -1).astype("float32") / 255
-
-#plot_label_clusters(vae, x_train, y_train)
 
     def visualizeTestData(self, n=5):
         """Get a visualisation of the validation data.
@@ -399,16 +402,20 @@ if __name__ == "__main__":
                 for model_type in ["VAE", "AE"]:
                     if model_type == "VAE":
                         for weight in [0.0001, 0.0005, 0.001, 0.005, 0.01]:
-                            obj = doe_model(d, m, n=d * 50000, latent_dim=latent_dim, kl_weight=weight, use_mlflow=True, mlflow_name="big-exp2d",model_type=model_type)
-                            #if not obj.load("../models/"):
+                            obj = doe_model(d, m, n=d * 50000, latent_dim=latent_dim, kl_weight=weight, use_mlflow=False, mlflow_name="big-exp2d",model_type=model_type)
+                            if not obj.load("../models/"):
+                                obj.generateData()
+                                obj.compile()
+                                obj.fit(50)
+                                obj.save("../models/")
+                            else:
+                                obj.plot_label_clusters_bbob()
+                    else:
+                        obj = doe_model(d, m, n=d * 50000, latent_dim=latent_dim, use_mlflow=False, mlflow_name="big-exp2d",model_type=model_type)
+                        if not obj.load("../models/"):
                             obj.generateData()
                             obj.compile()
                             obj.fit(50)
                             obj.save("../models/")
-                    else:
-                        obj = doe_model(d, m, n=d * 50000, latent_dim=latent_dim, use_mlflow=True, mlflow_name="big-exp2d",model_type=model_type)
-                        #if not obj.load("../models/"):
-                        obj.generateData()
-                        obj.compile()
-                        obj.fit(50)
-                        obj.save("../models/")
+                        else:
+                            obj.plot_label_clusters_bbob()
