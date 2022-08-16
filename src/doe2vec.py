@@ -72,7 +72,6 @@ class doe_model:
             self.sample = custom_sample
         self.use_mlflow = use_mlflow
         if use_mlflow:
-            mlflow.set_tracking_uri("../mlruns/")
             mlflow.set_experiment(mlflow_name)
             mlflow.start_run(
                 run_name=f"run {self.dim}-{self.m}-{self.latent_dim}-{self.seed}"

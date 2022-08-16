@@ -37,12 +37,13 @@ def plot_confusion_matrix(y_test,y_scores, classNames, title="confusion_matrix")
 """Classification experiment for BBOB
 """
 
-obj = doe_model(5, 9, n=20000, latent_dim=16, use_mlflow=False)
+obj = doe_model(5, 8, n=20000, latent_dim=24, use_mlflow=False, model_type="VAE", kl_weight=0.001)
 if not obj.load("../models/"):
     obj.generateData()
     obj.compile()
     obj.fit(100)
     obj.save("../models/")
+obj.plot_label_clusters_bbob()
 sample = obj.sample * 10 - 5
 
 encodings = []
