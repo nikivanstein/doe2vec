@@ -6,6 +6,8 @@ import mlflow.tensorflow
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+from datasets import load_dataset
+from huggingface_hub import from_pretrained_keras
 from matplotlib import cm
 from mpl_toolkits import mplot3d
 from numpy.random import seed
@@ -16,8 +18,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.neighbors import NearestNeighbors
 from tensorflow.keras import layers, losses
 from tensorflow.keras.models import Model
-from datasets import load_dataset
-from huggingface_hub import from_pretrained_keras
 
 import bbobbenchmarks as bbob
 from models import VAE, Autoencoder
@@ -417,18 +417,18 @@ class doe_model:
 
 if __name__ == "__main__":
     import os
+
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
     obj = doe_model(
-                2,
-                8,
-                n= 50000,
-                latent_dim=16,
-                kl_weight=0.001,
-                use_mlflow=False,
-                model_type="VAE"
-            )
+        2,
+        8,
+        n=50000,
+        latent_dim=16,
+        kl_weight=0.001,
+        use_mlflow=False,
+        model_type="VAE",
+    )
     obj.load_from_huggingface()
-    #test the model
+    # test the model
     obj.plot_label_clusters_bbob()
-    
