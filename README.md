@@ -16,6 +16,27 @@ Both the samples and the landscape should be scaled between 0 and 1.
 Afterwards you can use the package via:
 
 `from doe2vec import doe_model`
+
+## Load a model from the HuggingFace Hub
+
+Available models can be viewed here: https://huggingface.co/BasStein
+A model name is build up like BasStein/doe2vec-d2-m8-ls16-VAE-kl0.001  
+Where d is the number of dimensions, 8 the number (2^8) of samples, 16 the latent size, VAE the model type (variational autoencoder) and 0.001 the KL loss weight.
+
+Example code of loading a huggingface model
+
+    obj = doe_model(
+                2,
+                8,
+                n= 50000,
+                latent_dim=16,
+                kl_weight=0.001,
+                use_mlflow=False,
+                model_type="VAE"
+            )
+    obj.load_from_huggingface("BasStein/doe2vec-d2-m8-ls16-VAE-kl0.001")
+    #test the model
+    obj.plot_label_clusters_bbob()
  
 ## How to Setup your Environment for Development
 

@@ -16,6 +16,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.neighbors import NearestNeighbors
 from tensorflow.keras import layers, losses
 from tensorflow.keras.models import Model
+from datasets import load_dataset
+from huggingface_hub import from_pretrained_keras
 
 import bbobbenchmarks as bbob
 from models import VAE, Autoencoder
@@ -72,7 +74,6 @@ class doe_model:
             self.sample = custom_sample
         self.use_mlflow = use_mlflow
         if use_mlflow:
-            mlflow.set_tracking_uri("../mlruns/")
             mlflow.set_experiment(mlflow_name)
             mlflow.start_run(
                 run_name=f"run {self.dim}-{self.m}-{self.latent_dim}-{self.seed}"
@@ -83,6 +84,25 @@ class doe_model:
             mlflow.log_param("m", self.m)
             mlflow.log_param("latent_dim", self.latent_dim)
             mlflow.log_param("seed", self.seed)
+
+    def load_from_huggingface(self, name="BasStein/doe2vec-d2-m8-ls16-VAE-kl0.001"):
+        """Load a pre-trained model from a HuggingFace repository.
+
+        Args:
+            name (str, optional): the huggingface repo to load. Both dataset and models use a shared name.
+        """
+        dataset = load_dataset(name)["train"]
+        self.autoencoder = from_pretrained_keras(name)
+        self.autoencoder.compile(optimizer="adam")
+        self.sample = dataset["array_x"][0]
+        self.Y = dataset["y"]
+        self.functions = dataset["function"]
+        self.train_data = tf.cast(self.Y[:-50], tf.float32)
+        self.test_data = tf.cast(self.Y[-50:], tf.float32)
+        print("Loaded huggingface model and data")
+        self.summary()
+        self.fitNN()
+        return True
 
     def load(self, dir="models"):
         """Load a pre-trained Doe2vec model and data.
@@ -397,45 +417,18 @@ class doe_model:
 
 if __name__ == "__main__":
     import os
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-    for d in [5, 10]:
-        for m in [8]:
-            for latent_dim in [4, 8, 16, 24, 32]:
-                for model_type in ["VAE", "AE"]:
-                    if model_type == "VAE":
-                        for weight in [0.0001, 0.0005, 0.001, 0.005, 0.01]:
-                            obj = doe_model(
-                                d,
-                                m,
-                                n=d * 50000,
-                                latent_dim=latent_dim,
-                                kl_weight=weight,
-                                use_mlflow=True,
-                                mlflow_name="big-exp-5-10d",
-                                model_type=model_type,
-                            )
-                            if not obj.load("../models/"):
-                                obj.generateData()
-                                obj.compile()
-                                obj.fit(50)
-                                obj.save("../models/")
-                            else:
-                                obj.plot_label_clusters_bbob()
-                    else:
-                        obj = doe_model(
-                            d,
-                            m,
-                            n=d * 50000,
-                            latent_dim=latent_dim,
-                            use_mlflow=True,
-                            mlflow_name="big-exp-5-10d",
-                            model_type=model_type,
-                        )
-                        if not obj.load("../models/"):
-                            obj.generateData()
-                            obj.compile()
-                            obj.fit(50)
-                            obj.save("../models/")
-                        else:
-                            obj.plot_label_clusters_bbob()
+    obj = doe_model(
+                2,
+                8,
+                n= 50000,
+                latent_dim=16,
+                kl_weight=0.001,
+                use_mlflow=False,
+                model_type="VAE"
+            )
+    obj.load_from_huggingface()
+    #test the model
+    obj.plot_label_clusters_bbob()
+    
