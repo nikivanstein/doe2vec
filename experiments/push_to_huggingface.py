@@ -11,9 +11,9 @@ kl_weight = 0.001
 seed = 0
 dir = "../models"
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-for d in [5]:
+for d in [2, 5]:
     for m in [8]:
-        for latent_dim in [16, 24]:
+        for latent_dim in [4, 8, 16, 24, 32]:
             obj = doe_model(
                 d,
                 m,
