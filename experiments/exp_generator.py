@@ -26,7 +26,7 @@ import matplotlib.animation as animation
 
 
 
-def generateMovie(f, i, model_type, latent_index, latent_size, frn  = 50):
+def generateMovie(f, i, model_type, latent_size, frn  = 50):
     obj = doe_model(2, 8, n=20000, latent_dim=latent_size, use_mlflow=False, model_type=model_type, kl_weight=0.001)
     if not obj.load("../models/"):
         obj.generateData()
@@ -45,14 +45,13 @@ def generateMovie(f, i, model_type, latent_index, latent_size, frn  = 50):
     print(encoded)
 
     #[ 0.06200744 -1.4341657   3.165122    0.8527643 ]
-    index = latent_index
     frames = []
     fig = plt.figure(figsize=(4, 4))
 
     # display reconstruction
     ax = fig.add_subplot(1, 1, 1, projection="3d")
 
-    def update_plot(frame_number, frames, plot, sample ):
+    def update_plot(frame_number, frames, titles, plot, sample ):
         plot[0].remove()
         plot[0] = ax.plot_trisurf(
             sample[:, 0],
@@ -61,6 +60,7 @@ def generateMovie(f, i, model_type, latent_index, latent_size, frn  = 50):
             cmap=cm.jet,
             antialiased=True,
         )
+        ax.set_title(titles[frame_number])
         ax.xaxis.set_ticklabels([])
         ax.yaxis.set_ticklabels([])
         ax.zaxis.set_ticklabels([])
@@ -71,15 +71,36 @@ def generateMovie(f, i, model_type, latent_index, latent_size, frn  = 50):
             line.set_visible(False)
         for line in ax.zaxis.get_ticklines():
             line.set_visible(False)
+        #if frame_number%120 == 0:
+        #    plt.savefig("AE/frame"+str(frame_number)+".png")
 
-
-    
-    for x in np.linspace(encoded[index]-1.0, encoded[index]+1.0, num=frn):
-        print(x)
-        encoded_x = copy.deepcopy(encoded)
-        encoded_x[index] = x
-        decoded = obj.autoencoder.decoder(np.array([encoded_x])).numpy()[0]
-        frames.append(decoded)
+    titles = []
+    for index in range(latent_size):
+        print(index)
+        for x in np.linspace(encoded[index], encoded[index]+1.0, num=frn):
+            encoded_x = copy.deepcopy(encoded)
+            encoded_x[index] = x
+            decoded = obj.autoencoder.decoder(np.array([encoded_x])).numpy()[0]
+            titles.append(f"Varying latent variable {(index+1)} of {latent_size}")
+            frames.append(decoded)
+        for x in np.linspace(encoded[index]+1.0, encoded[index], num=frn):
+            encoded_x = copy.deepcopy(encoded)
+            encoded_x[index] = x
+            decoded = obj.autoencoder.decoder(np.array([encoded_x])).numpy()[0]
+            titles.append(f"Varying latent variable {(index+1)} of {latent_size}")
+            frames.append(decoded)
+        for x in np.linspace(encoded[index], encoded[index]-1.0, num=frn):
+            encoded_x = copy.deepcopy(encoded)
+            encoded_x[index] = x
+            decoded = obj.autoencoder.decoder(np.array([encoded_x])).numpy()[0]
+            titles.append(f"Varying latent variable {(index+1)} of {latent_size}")
+            frames.append(decoded)
+        for x in np.linspace(encoded[index]-1.0, encoded[index], num=frn):
+            encoded_x = copy.deepcopy(encoded)
+            encoded_x[index] = x
+            decoded = obj.autoencoder.decoder(np.array([encoded_x])).numpy()[0]
+            titles.append(f"Varying latent variable {(index+1)} of {latent_size}")
+            frames.append(decoded)
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
@@ -102,20 +123,19 @@ def generateMovie(f, i, model_type, latent_index, latent_size, frn  = 50):
     for line in ax.zaxis.get_ticklines():
         line.set_visible(False)
     #ax.set_zlim(0,1.1)
-    fps = 30
-    ani = animation.FuncAnimation(fig, update_plot, frn, fargs=(frames, plot, sample), interval=1000/fps)
+    fps = 40
+    ani = animation.FuncAnimation(fig, update_plot, len(frames), fargs=(frames, titles, plot, sample), interval=1000/fps)
 
 
     # ani.save('movie.mp4')
     #plt.show()
 
-    fn = f'gifs/{model_type}_2d_reconstruction_f{f}_i{i}_{latent_index}'
-    #ani.save(fn+'.mp4',writer='ffmpeg',fps=fps)
-    ani.save(fn+'.gif',writer='imagemagick',fps=fps)
+    fn = f'gifs/{model_type}_2d_reconstruction_{latent_size}_f{f}_i{i}'
+    ani.save(fn+'.mp4',writer='ffmpeg',fps=fps)
+    #ani.save(fn+'.gif',writer='imagemagick',fps=fps)
 
 i = 0
-for latent_size in [4,8]:
-    for f in [11,12,13,14,15,22,24]:
-        for model_type in ["VAE", "AE"]:
-            for latent_index in range(latent_size):
-                generateMovie(f,i,model_type,latent_index, latent_size,frn=120)
+for latent_size in [4]: #8
+    for f in [22]:#11,12,13,14,15,24
+        for model_type in ["AE"]:#, "AE"
+            generateMovie(f,i,model_type, latent_size,frn=120)

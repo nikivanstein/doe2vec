@@ -65,8 +65,8 @@ def createSurfacePlot(bbob_fun, gen_fun, name="bbobx", title="f_x"):
 
 
 
-obj = doe2vec(2, 8, n=1000000, latent_dim=16, use_mlflow=False)
-if not obj.load():
+obj = doe_model(2, 8, n=1000000, latent_dim=16, model_type="VAE", kl_weight=0.001, use_mlflow=False)
+if not obj.load("../models"):
     obj.generateData()
     obj.compile()
     obj.fit(100)
@@ -76,7 +76,7 @@ sample = obj.sample * 10 - 5
 for f in range(1,25):
     for i in range(5):
         fun, opt = bbob.instantiate(f,i)
-        name = f"plots-big-2-8-16/bbob-f-{f}-i-{i}"
+        name = f"plots_VAE/bbob-f-{f}-i-{i}"
         bbob_y =  np.asarray(list(map(fun, sample)))
         array_y = (bbob_y.flatten() - np.min(bbob_y)) / (
                     np.max(bbob_y) - np.min(bbob_y)
