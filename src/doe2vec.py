@@ -39,6 +39,7 @@ class doe_model:
         use_mlflow=False,
         mlflow_name="Doc2Vec",
         model_type="VAE",
+        use_bbob=False,
     ):
         """Doe2Vec model to transform Design of Experiments to feature vectors.
 
@@ -53,6 +54,7 @@ class doe_model:
             use_mlflow (bool, optional): To use the mlflow backend to log experiments. Defaults to False.
             mlflow_name (str, optional): The name to log the mlflow experiment. Defaults to "Doc2Vec".
             model_type (str, optional): The model to use, either "AE" or "VAE". Defaults to "VAE".
+            use_bbob (bool, optional): To use BBOB functions in addition to random generated functions.
         """
         self.dim = dim
         self.m = m
@@ -62,6 +64,7 @@ class doe_model:
         self.seed = seed_nr
         self.use_VAE = False
         self.model_type = model_type
+        self.use_bbob = use_bbob
         if model_type == "VAE":
             self.use_VAE = True
             self.model_type = self.model_type + str(kl_weight)
@@ -155,10 +158,13 @@ class doe_model:
         self.Y = []
         self.functions = []
         tries = 0
+        maxn = self.n
+        if self.use_bbob:
+            maxn = maxn - (102*25)
         while len(self.Y) < self.n:
             tries += 1
             # create an artificial function
-            tree = genTree.generate_tree(6, 12)
+            tree = genTree.generate_tree(6, 16)
             exp = genTree2exp.generate_tree2exp(tree)
             fun = genExp2fun.generate_exp2fun(
                 exp, len(self.sample), self.sample.shape[1]
@@ -183,10 +189,22 @@ class doe_model:
                 self.Y.append(array_y)
             except:
                 continue
+        if self.use_bbob:
+            #add the first 100 instances of each bbob function in addition
+            bbob_sample = self.sample * 10 - 5
+            for i in range(102):
+                for f in range(1, 25):
+                    fun, opt = bbob.instantiate(f, i)
+                    bbob_y = np.asarray(list(map(fun, bbob_sample)))
+                    array_y = (bbob_y.flatten() - np.min(bbob_y)) / (
+                        np.max(bbob_y) - np.min(bbob_y)
+                    )
+                    self.Y.append(array_y)
         self.Y = np.array(self.Y)
         self.functions = np.array(self.functions)
         self.train_data = tf.cast(self.Y[:-50], tf.float32)
         self.test_data = tf.cast(self.Y[-50:], tf.float32)
+        
         return self.Y
 
     def setData(self, Y):

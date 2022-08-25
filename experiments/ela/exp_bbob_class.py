@@ -52,16 +52,16 @@ def plot_confusion_matrix(y_test, y_scores, classNames, title="confusion_matrix"
 """
 f1s = []
 f1s_elas = []
-for dim in [2,5,10,15,20,30,40,50,100]:
+for dim in [2,5,10,15,20,30,40]:
 
     obj = doe_model(
-        dim, 8, n=400000, latent_dim=24, use_mlflow=False, model_type="VAE", kl_weight=0.001
+        dim, 8, n=400000, latent_dim=24, use_mlflow=False, model_type="VAE", kl_weight=0.01
     )
-    if not obj.load("../../models/"):
-        obj.generateData()
-        obj.compile()
-        obj.fit(100)
-        obj.save("../../models/")
+    #if not obj.load("../../models/"):
+    obj.generateData()
+    obj.compile()
+    obj.fit(200)
+    obj.save("../../models/")
     #obj.plot_label_clusters_bbob()
     sample = obj.sample * 10 - 5
     encodings = []
@@ -71,7 +71,7 @@ for dim in [2,5,10,15,20,30,40,50,100]:
     multim_label = []
     global_label = []
     funnel_label = []
-    for i in range(100):
+    for i in range(120):
          for f in range(1, 25):
             fun, opt = bbob.instantiate(f, i)
             bbob_y = np.asarray(list(map(fun, sample)))
@@ -140,7 +140,7 @@ for dim in [2,5,10,15,20,30,40,50,100]:
     y_3 = np.array(funnel_label).flatten()
 
     #write DOE data for ELA to excel
-    
+    test_size = 20*25
     input_names = []
     input_names_2 = []
     output_names = []
@@ -157,10 +157,10 @@ for dim in [2,5,10,15,20,30,40,50,100]:
     doe_dict = {}
     for d in range(dim):
         doe_dict[f"DV{d+1}"] = sample[:,d]
-    print(len(sample[:,0]))
+    #print(len(sample[:,0]))
     for o in range(len(evaluated_landscapes)):
         doe_dict[f"Response{o+1}"] = evaluated_landscapes[o]
-    print(len(evaluated_landscapes[0]))
+    #print(len(evaluated_landscapes[0]))
     df_doe = pd.DataFrame(doe_dict)
     with pd.ExcelWriter(f'ela-d{dim}.xlsx') as writer:
         df_kpi.to_excel(writer, sheet_name='KPI',index=False)
@@ -176,64 +176,64 @@ for dim in [2,5,10,15,20,30,40,50,100]:
     ela_encodings = []
     response = 1
     for f in range(1, 25):
-        for i in range(100):
+        for i in range(120):
             ela_encodings.append(ela[f"Response{response}"].values)
             response+=1
     ela_X = np.array(ela_encodings)
 
     
-    X_train = X[:-200]
-    X_test = X[-200:]
+    X_train = X[:-test_size]
+    X_test = X[-test_size:]
 
     rf = RandomForestClassifier(n_estimators=100)
-    rf.fit(X_train, y_1[:-200])
+    rf.fit(X_train, y_1[:-test_size])
     resRf = rf.predict(X_test)
-    f1_macro_rf = f1_score(y_1[-200:], resRf, average='macro')
+    f1_macro_rf = f1_score(y_1[-test_size:], resRf, average='macro')
     f1s.append(f1_macro_rf)
 
     rf = RandomForestClassifier(n_estimators=100)
-    rf.fit(X_train, y_2[:-200])
+    rf.fit(X_train, y_2[:-test_size])
     resRf = rf.predict(X_test)
-    f1_macro_rf = f1_score(y_2[-200:], resRf, average='macro')
+    f1_macro_rf = f1_score(y_2[-test_size:], resRf, average='macro')
     f1s.append(f1_macro_rf)
 
     rf = RandomForestClassifier(n_estimators=100)
-    rf.fit(X_train, y_3[:-200])
+    rf.fit(X_train, y_3[:-test_size])
     resRf = rf.predict(X_test)
-    f1_macro_rf = f1_score(y_3[-200:], resRf, average='macro')
+    f1_macro_rf = f1_score(y_3[-test_size:], resRf, average='macro')
     f1s.append(f1_macro_rf)
 
     #plot_confusion_matrix(
     #    y_test, resRf, np.unique(fuction_groups), title=f"Random Forest Confusion Matrix VAE d{dim}"
     #)
     
-    print(dim, f1_macro_rf)
+    print(dim, f1s)
 
 
     #ELA model
-    X_ela_train = ela_X[:-200]
-    X_ela_test = ela_X[-200:]
+    X_ela_train = ela_X[:-test_size]
+    X_ela_test = ela_X[-test_size:]
 
     rf = RandomForestClassifier(n_estimators=100)
-    rf.fit(X_ela_train, y_1[:-200])
+    rf.fit(X_ela_train, y_1[:-test_size])
     resRf = rf.predict(X_ela_test)
-    f1_macro_rf_ela = f1_score(y_1[-200:], resRf, average='macro')
+    f1_macro_rf_ela = f1_score(y_1[-test_size:], resRf, average='macro')
     f1s_elas.append(f1_macro_rf_ela)
 
     rf = RandomForestClassifier(n_estimators=100)
-    rf.fit(X_ela_train, y_2[:-200])
+    rf.fit(X_ela_train, y_2[:-test_size])
     resRf = rf.predict(X_ela_test)
-    f1_macro_rf_ela = f1_score(y_2[-200:], resRf, average='macro')
+    f1_macro_rf_ela = f1_score(y_2[-test_size:], resRf, average='macro')
     f1s_elas.append(f1_macro_rf_ela)
 
     rf = RandomForestClassifier(n_estimators=100)
-    rf.fit(X_ela_train, y_3[:-200])
+    rf.fit(X_ela_train, y_3[:-test_size])
     resRf = rf.predict(X_ela_test)
-    f1_macro_rf_ela = f1_score(y_3[-200:], resRf, average='macro')
+    f1_macro_rf_ela = f1_score(y_3[-test_size:], resRf, average='macro')
     f1s_elas.append(f1_macro_rf_ela)
 
     
-    print(dim, f1_macro_rf_ela)
+    print(dim, f1s_elas)
     # plot_confusion_matrix(mul_dt, np.unique(fuction_groups))
 
 print(f1s)
