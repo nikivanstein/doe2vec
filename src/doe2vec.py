@@ -6,8 +6,6 @@ import mlflow.tensorflow
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from datasets import load_dataset
-from huggingface_hub import from_pretrained_keras
 from matplotlib import cm
 from mpl_toolkits import mplot3d
 from numpy.random import seed
@@ -18,6 +16,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.neighbors import NearestNeighbors
 from tensorflow.keras import layers, losses
 from tensorflow.keras.models import Model
+from datasets import load_dataset
+from huggingface_hub import from_pretrained_keras
 
 import bbobbenchmarks as bbob
 from models import VAE, Autoencoder

@@ -1,5 +1,7 @@
+#Experiment with ELA and bbob classes
+import pandas as pd
 import os
-
+from sklearn import manifold
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
@@ -45,32 +47,21 @@ def plot_confusion_matrix(y_test, y_scores, classNames, title="confusion_matrix"
     df.figure.savefig(title)
 
 
-"""Classification experiment for BBOB
-"""
+ela = pd.read_excel('featELA_BBOB_original.xlsx', index_col=0)
+ela = ela.fillna(0)
+#print(ela.Response1.values)
 
-obj = doe_model(
-    5, 8, n=20000, latent_dim=24, use_mlflow=False, model_type="VAE", kl_weight=0.001
-)
-if not obj.load("../models/"):
-    obj.generateData()
-    obj.compile()
-    obj.fit(100)
-    obj.save("../models/")
-obj.plot_label_clusters_bbob()
-sample = obj.sample * 10 - 5
+#for column in ela.columns[:]:
+#    print(column)
 
 encodings = []
 fuction_groups = []
-
+fuction_nrs = []
+response = 1
 for f in range(1, 25):
     for i in range(50):
-        fun, opt = bbob.instantiate(f, i)
-        bbob_y = np.asarray(list(map(fun, sample)))
-        array_x = (bbob_y.flatten() - np.min(bbob_y)) / (
-            np.max(bbob_y) - np.min(bbob_y)
-        )
-        encoded = obj.encode([array_x])
-        encodings.append(encoded[0])
+        encodings.append(ela[f"Response{response}"].values)
+        response += 1
         class_label = 0
         if f in [1, 2, 3, 4, 5]:
             class_label = "separable"
@@ -82,11 +73,13 @@ for f in range(1, 25):
             class_label = "multi modal gl."
         elif f in [20, 21, 22, 23, 24]:
             class_label = "multi modal"
-
+        fuction_nrs.append(f)
         fuction_groups.append(class_label)
+
 
 X = np.array(encodings)
 y = np.array(fuction_groups).flatten()
+fuction_nrs = np.array(fuction_nrs).flatten()
 print(X.shape, y.shape)
 print(np.unique(fuction_groups))
 # y_dense = LabelBinarizer().fit_transform(y)
@@ -101,7 +94,7 @@ dt.fit(X_train, y_train)
 res = dt.predict(X_test)
 
 plot_confusion_matrix(
-    y_test, res, np.unique(fuction_groups), title="Decision Tree Confusion Matrix"
+    y_test, res, np.unique(fuction_groups), title="Decision Tree Confusion Matrix_ELA"
 )
 # mul_dt = multilabel_confusion_matrix(
 #    y_test,
@@ -112,7 +105,23 @@ rf.fit(X_train, y_train)
 resRf = rf.predict(X_test)
 
 plot_confusion_matrix(
-    y_test, resRf, np.unique(fuction_groups), title="Random Forest Confusion Matrix"
+    y_test, resRf, np.unique(fuction_groups), title="Random Forest Confusion Matrix_ELA"
 )
 
-# plot_confusion_matrix(mul_dt, np.unique(fuction_groups))
+
+X = np.array(encodings)
+y = np.array(fuction_nrs).flatten()
+mds = manifold.MDS(
+    n_components=2,
+    random_state=0,
+)
+embedding = mds.fit_transform(X).T
+# display a 2D plot of the bbob functions in the latent space
+
+plt.figure(figsize=(12, 10))
+plt.scatter(embedding[0], embedding[1], c=y, cmap=cm.jet)
+plt.colorbar()
+plt.xlabel("")
+plt.ylabel("")
+
+plt.savefig("latent_space_ela.png")
