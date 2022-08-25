@@ -84,22 +84,10 @@ print(X.shape, y.shape)
 print(np.unique(fuction_groups))
 # y_dense = LabelBinarizer().fit_transform(y)
 
-dt = DecisionTreeClassifier()
 rf = RandomForestClassifier(n_estimators=100)
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
-
-dt.fit(X_train, y_train)
-res = dt.predict(X_test)
-
-plot_confusion_matrix(
-    y_test, res, np.unique(fuction_groups), title="Decision Tree Confusion Matrix_ELA"
-)
-# mul_dt = multilabel_confusion_matrix(
-#    y_test,
-#    res,
-#    labels=np.unique(fuction_groups))
 
 rf.fit(X_train, y_train)
 resRf = rf.predict(X_test)

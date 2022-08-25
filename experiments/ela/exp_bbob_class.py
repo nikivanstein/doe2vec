@@ -51,10 +51,11 @@ def plot_confusion_matrix(y_test, y_scores, classNames, title="confusion_matrix"
 """Classification experiment for BBOB
 """
 f1s = []
+f1s_elas = []
 for dim in [2,5,10,15,20,30,40,50,100]:
 
     obj = doe_model(
-        dim, 8, n=100000, latent_dim=24, use_mlflow=False, model_type="VAE", kl_weight=0.001
+        dim, 8, n=400000, latent_dim=24, use_mlflow=False, model_type="VAE", kl_weight=0.001
     )
     if not obj.load("../../models/"):
         obj.generateData()
@@ -67,7 +68,9 @@ for dim in [2,5,10,15,20,30,40,50,100]:
     fuction_groups = []
     evaluated_landscapes = []
 
-   
+    multim_label = []
+    global_label = []
+    funnel_label = []
     for i in range(100):
          for f in range(1, 25):
             fun, opt = bbob.instantiate(f, i)
@@ -79,24 +82,62 @@ for dim in [2,5,10,15,20,30,40,50,100]:
             evaluated_landscapes.append(array_x)
             encodings.append(encoded[0])
             class_label = 0
-            if f in [1, 2, 3, 4, 5]:
-                class_label = "separable"
-            elif f in [6, 7, 8, 9]:
-                class_label = "low cond."
-            elif f in [10, 11, 12, 13, 14]:
-                class_label = "high cond."
-            elif f in [15, 16, 17, 18, 19]:
-                class_label = "multi modal gl."
-            elif f in [20, 21, 22, 23, 24]:
-                class_label = "multi modal"
-
-            fuction_groups.append(class_label)
+            if f in [1,2]:
+                multim_label.append("none")
+                global_label.append("none")
+                funnel_label.append("yes")
+            elif f in [3,4]:
+                multim_label.append("high")
+                global_label.append("strong")
+                funnel_label.append("yes")
+            elif f in [8,9]:
+                multim_label.append("low")
+                global_label.append("none")
+                funnel_label.append("yes")
+            elif f in [5,6,7,10,11,12,13,14]:
+                multim_label.append("none")
+                global_label.append("none")
+                funnel_label.append("yes")
+            elif f in [15,19]:
+                multim_label.append("high")
+                global_label.append("strong")
+                funnel_label.append("yes")
+            elif f in [16]:
+                multim_label.append("high")
+                global_label.append("medium")
+                funnel_label.append("none")
+            elif f in [17,18]:
+                multim_label.append("high")
+                global_label.append("medium")
+                funnel_label.append("yes")
+            elif f in [20]:
+                multim_label.append("medium")
+                global_label.append("deceptive")
+                funnel_label.append("yes")
+            elif f in [21]:
+                multim_label.append("medium")
+                global_label.append("none")
+                funnel_label.append("none")
+            elif f in [22]:
+                multim_label.append("low")
+                global_label.append("none")
+                funnel_label.append("none")
+            elif f in [23]:
+                multim_label.append("high")
+                global_label.append("none")
+                funnel_label.append("none")
+            elif f in [24]:
+                multim_label.append("high")
+                global_label.append("weak")
+                funnel_label.append("yes")
 
     np.save(f"dims/{dim}-landscapes.npy",evaluated_landscapes)
     np.save(f"dims/{dim}-sample.npy", sample)
 
     X = np.array(encodings)
-    y = np.array(fuction_groups).flatten()
+    y_1 = np.array(multim_label).flatten()
+    y_2 = np.array(global_label).flatten()
+    y_3 = np.array(funnel_label).flatten()
 
     #write DOE data for ELA to excel
     
@@ -126,27 +167,79 @@ for dim in [2,5,10,15,20,30,40,50,100]:
         df_bounds.to_excel(writer, sheet_name='Bounds',index=False)
         df_doe.to_excel(writer, sheet_name='DOE_1',index=False)
 
-    run_ELA(f'ela-d{dim}.xlsx', f'd{dim}')
+    if dim > 40:
+        run_ELA(f'ela-d{dim}.xlsx', f'd{dim}')
 
-    rf = RandomForestClassifier(n_estimators=100)
+
+    ela = pd.read_excel(f'CEOELA_results/d{dim}/featELA_d{dim}_original.xlsx', index_col=0)
+    ela = ela.fillna(0)
+    ela_encodings = []
+    response = 1
+    for f in range(1, 25):
+        for i in range(100):
+            ela_encodings.append(ela[f"Response{response}"].values)
+            response+=1
+    ela_X = np.array(ela_encodings)
+
+    
     X_train = X[:-200]
     X_test = X[-200:]
-    y_train = y[:-200]
-    y_test = y[-200:]
 
-    rf.fit(X_train, y_train)
+    rf = RandomForestClassifier(n_estimators=100)
+    rf.fit(X_train, y_1[:-200])
     resRf = rf.predict(X_test)
-
-    plot_confusion_matrix(
-        y_test, resRf, np.unique(fuction_groups), title=f"Random Forest Confusion Matrix VAE d{dim}"
-    )
-    f1_macro_rf = f1_score(y_test, resRf, average='macro')
+    f1_macro_rf = f1_score(y_1[-200:], resRf, average='macro')
     f1s.append(f1_macro_rf)
+
+    rf = RandomForestClassifier(n_estimators=100)
+    rf.fit(X_train, y_2[:-200])
+    resRf = rf.predict(X_test)
+    f1_macro_rf = f1_score(y_2[-200:], resRf, average='macro')
+    f1s.append(f1_macro_rf)
+
+    rf = RandomForestClassifier(n_estimators=100)
+    rf.fit(X_train, y_3[:-200])
+    resRf = rf.predict(X_test)
+    f1_macro_rf = f1_score(y_3[-200:], resRf, average='macro')
+    f1s.append(f1_macro_rf)
+
+    #plot_confusion_matrix(
+    #    y_test, resRf, np.unique(fuction_groups), title=f"Random Forest Confusion Matrix VAE d{dim}"
+    #)
+    
     print(dim, f1_macro_rf)
+
+
+    #ELA model
+    X_ela_train = ela_X[:-200]
+    X_ela_test = ela_X[-200:]
+
+    rf = RandomForestClassifier(n_estimators=100)
+    rf.fit(X_train, y_1[:-200])
+    resRf = rf.predict(X_test)
+    f1_macro_rf_ela = f1_score(y_1[-200:], resRf, average='macro')
+    f1s_elas.append(f1_macro_rf_ela)
+
+    rf = RandomForestClassifier(n_estimators=100)
+    rf.fit(X_train, y_2[:-200])
+    resRf = rf.predict(X_test)
+    f1_macro_rf_ela = f1_score(y_2[-200:], resRf, average='macro')
+    f1s_elas.append(f1_macro_rf_ela)
+
+    rf = RandomForestClassifier(n_estimators=100)
+    rf.fit(X_train, y_3[:-200])
+    resRf = rf.predict(X_test)
+    f1_macro_rf_ela = f1_score(y_3[-200:], resRf, average='macro')
+    f1s_elas.append(f1_macro_rf_ela)
+
+    
+    print(dim, f1_macro_rf_ela)
     # plot_confusion_matrix(mul_dt, np.unique(fuction_groups))
 
-print(f1_macro_rf)
-np.save(f"f1macro.npy", f1_macro_rf)
+print(f1s)
+print(f1s_elas)
+np.save(f"f1_VAE.npy", f1s)
+np.save("f1_ela.npy",f1s_elas)
 
 
 

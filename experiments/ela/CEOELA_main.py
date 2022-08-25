@@ -49,7 +49,7 @@ def run_ELA(filename='DOE_data.xlsx', label="DOE"):
 
 
 
-run_ELA('ela-d2.xlsx', 'd2')
+#run_ELA('ela-d2.xlsx', 'd2')
 
 
 
