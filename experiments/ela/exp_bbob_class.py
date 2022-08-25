@@ -215,20 +215,20 @@ for dim in [2,5,10,15,20,30,40,50,100]:
     X_ela_test = ela_X[-200:]
 
     rf = RandomForestClassifier(n_estimators=100)
-    rf.fit(X_train, y_1[:-200])
-    resRf = rf.predict(X_test)
+    rf.fit(X_ela_train, y_1[:-200])
+    resRf = rf.predict(X_ela_test)
     f1_macro_rf_ela = f1_score(y_1[-200:], resRf, average='macro')
     f1s_elas.append(f1_macro_rf_ela)
 
     rf = RandomForestClassifier(n_estimators=100)
-    rf.fit(X_train, y_2[:-200])
-    resRf = rf.predict(X_test)
+    rf.fit(X_ela_train, y_2[:-200])
+    resRf = rf.predict(X_ela_test)
     f1_macro_rf_ela = f1_score(y_2[-200:], resRf, average='macro')
     f1s_elas.append(f1_macro_rf_ela)
 
     rf = RandomForestClassifier(n_estimators=100)
-    rf.fit(X_train, y_3[:-200])
-    resRf = rf.predict(X_test)
+    rf.fit(X_ela_train, y_3[:-200])
+    resRf = rf.predict(X_ela_test)
     f1_macro_rf_ela = f1_score(y_3[-200:], resRf, average='macro')
     f1s_elas.append(f1_macro_rf_ela)
 
