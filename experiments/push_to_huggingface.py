@@ -5,12 +5,15 @@ from datasets import Dataset
 from huggingface_hub import push_to_hub_keras
 from huggingface_hub import upload_file
 from doe2vec import doe_model
+import tensorflow as tf
 
 model_type = "VAE"
 kl_weight = 0.001
 seed = 0
 dir = "../models"
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
+tf.config.experimental.enable_tensor_float_32_execution(False)
 for d in [2]:
     for m in [8]:
         for latent_dim in [24]:
@@ -34,7 +37,7 @@ for d in [2]:
                 f"{dir}/functions_{d}-{m}-{latent_dim}-{seed}-{model_type}{kl_weight}.npy"
             )
             datadict = {
-                "y": data,
+                "y": data[:250000],
                 "function": functions,
                 "array_x": [obj.sample] * len(functions),
             }
@@ -79,7 +82,7 @@ Then import and load the model.
     from doe2vec import doe_model
 
     obj = doe_model(
-        {dim},
+        {d},
         {m},
         latent_dim={latent_dim},
         kl_weight={kl_weight},
