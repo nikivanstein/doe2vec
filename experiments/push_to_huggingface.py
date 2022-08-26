@@ -42,7 +42,6 @@ for d in [2]:
                 "array_x": [obj.sample] * len(functions),
             }
             dataset = Dataset.from_dict(datadict)
-            print(dataset)
             push_to_hub_keras(
                 obj.autoencoder,
                 f"doe2vec-d{d}-m{m}-ls{latent_dim}-{model_type}-kl{kl_weight}",
@@ -63,6 +62,12 @@ datasets:
 - doe2vec-d{d}-m{m}-ls{latent_dim}-{model_type}-kl{kl_weight}
 metrics:
 - mse
+co2_eq_emissions:
+  emissions: 0.0363
+  source: "code carbon"
+  training_type: "pre-training"
+  geographical_location: "Leiden, The Netherlands"
+  hardware_used: "1 Tesla T4"
 ---
 
 ## Model description
@@ -104,12 +109,6 @@ The representations can then be used for downstream tasks such as automatic opti
 The model is trained using a weighed KL loss and mean squared error reconstruction loss.
 The model is trained using 250.000 randomly generated functions (see the dataset) over 100 epochs.
 
-co2_eq_emissions:
-  emissions: 0.0363
-  source: "code carbon"
-  training_type: "pre-training"
-  geographical_location: "Leiden, The Netherlands"
-  hardware_used: "1 Tesla T4"
 """
             text_file = open("README.md", "wt")
             n = text_file.write(readme)
