@@ -67,6 +67,7 @@ class doe_model:
         self.use_bbob = use_bbob
         if model_type == "VAE":
             self.use_VAE = True
+            self.pure_model_type = self.model_type
             self.model_type = self.model_type + str(kl_weight)
         seed(self.seed)
         # generate the DOE using Sobol
@@ -88,12 +89,13 @@ class doe_model:
             mlflow.log_param("latent_dim", self.latent_dim)
             mlflow.log_param("seed", self.seed)
 
-    def load_from_huggingface(self, name="BasStein/doe2vec-d2-m8-ls16-VAE-kl0.001"):
+    def load_from_huggingface(self, repo="BasStein"):
         """Load a pre-trained model from a HuggingFace repository.
 
         Args:
-            name (str, optional): the huggingface repo to load. Both dataset and models use a shared name.
+            repo (str, optional): the huggingface repo to load from.
         """
+        name = f"{repo}/doe2vec-d{self.dim}-m{self.m}-ls{self.latent_dim}-{self.pure_model_type}-kl{self.kl_weight}"
         dataset = load_dataset(name)["train"]
         self.autoencoder = from_pretrained_keras(name)
         self.autoencoder.compile(optimizer="adam")

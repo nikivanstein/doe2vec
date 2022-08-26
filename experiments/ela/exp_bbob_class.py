@@ -52,16 +52,16 @@ def plot_confusion_matrix(y_test, y_scores, classNames, title="confusion_matrix"
 """
 f1s = []
 f1s_elas = []
-for dim in [2,5,10,15,20,30,40]:
+for dim in [2,5,10,40]:#,15,20,30,40
 
     obj = doe_model(
-        dim, 8, n=400000, latent_dim=24, use_mlflow=False, model_type="VAE", kl_weight=0.01
+        dim, 8, n=250000, latent_dim=24, use_mlflow=False, model_type="VAE", kl_weight=0.001, use_bbob=True
     )
-    #if not obj.load("../../models/"):
-    obj.generateData()
-    obj.compile()
-    obj.fit(200)
-    obj.save("../../models/")
+    if not obj.load("../../models/"):
+        obj.generateData()
+        obj.compile()
+        obj.fit(100)
+        obj.save("../../models/")
     #obj.plot_label_clusters_bbob()
     sample = obj.sample * 10 - 5
     encodings = []
@@ -167,16 +167,16 @@ for dim in [2,5,10,15,20,30,40]:
         df_bounds.to_excel(writer, sheet_name='Bounds',index=False)
         df_doe.to_excel(writer, sheet_name='DOE_1',index=False)
 
-    if dim > 40:
-        run_ELA(f'ela-d{dim}.xlsx', f'd{dim}')
+    #if dim > 40:
+    run_ELA(f'ela-d{dim}.xlsx', f'd{dim}')
 
 
     ela = pd.read_excel(f'CEOELA_results/d{dim}/featELA_d{dim}_original.xlsx', index_col=0)
     ela = ela.fillna(0)
     ela_encodings = []
     response = 1
-    for f in range(1, 25):
-        for i in range(120):
+    for i in range(120):
+        for f in range(1, 25):
             ela_encodings.append(ela[f"Response{response}"].values)
             response+=1
     ela_X = np.array(ela_encodings)
