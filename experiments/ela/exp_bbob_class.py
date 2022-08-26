@@ -20,6 +20,7 @@ from sklearn.metrics import (classification_report, confusion_matrix,
 from sklearn.model_selection import cross_val_score
 from sklearn.preprocessing import LabelBinarizer
 from CEOELA_main import run_ELA
+from codecarbon import EmissionsTracker
 
 
 def plot_confusion_matrix(y_test, y_scores, classNames, title="confusion_matrix"):
@@ -52,15 +53,19 @@ def plot_confusion_matrix(y_test, y_scores, classNames, title="confusion_matrix"
 """
 f1s = []
 f1s_elas = []
-for dim in [2,5,10,40]:#,15,20,30,40
+for dim in [2,5,10]:#,15,20,30,40
 
     obj = doe_model(
         dim, 8, n=250000, latent_dim=24, use_mlflow=False, model_type="VAE", kl_weight=0.001, use_bbob=True
     )
+    
     if not obj.load("../../models/"):
         obj.generateData()
+        tracker = EmissionsTracker(project_name=f"doe2vec-d{dim}", output_dir="../../models/")
+        tracker.start()
         obj.compile()
         obj.fit(100)
+        tracker.stop()
         obj.save("../../models/")
     #obj.plot_label_clusters_bbob()
     sample = obj.sample * 10 - 5
