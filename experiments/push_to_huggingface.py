@@ -63,6 +63,7 @@ datasets:
 - doe2vec-d{d}-m{m}-ls{latent_dim}-{model_type}-kl{kl_weight}
 metrics:
 - mse
+---
 
 ## Model description
 
