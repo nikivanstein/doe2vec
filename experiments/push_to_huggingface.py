@@ -31,23 +31,23 @@ for d in [2]:
                 obj.fit(100)
                 obj.save("../models/")
             data = np.load(
-                f"{dir}/data_{d}-{m}-{latent_dim}-{seed}-{model_type}{kl_weight}.npy"
+               f"{dir}/data_{d}-{m}-{latent_dim}-{seed}-{model_type}{kl_weight}.npy"
             )
             functions = np.load(
-                f"{dir}/functions_{d}-{m}-{latent_dim}-{seed}-{model_type}{kl_weight}.npy"
+               f"{dir}/functions_{d}-{m}-{latent_dim}-{seed}-{model_type}{kl_weight}.npy"
             )
             datadict = {
-                "y": data[:250000],
-                "function": functions,
-                "array_x": [obj.sample] * len(functions),
+               "y": data[:250000],
+               "function": functions,
+               "array_x": [obj.sample] * len(functions),
             }
             dataset = Dataset.from_dict(datadict)
             push_to_hub_keras(
-                obj.autoencoder,
-                f"doe2vec-d{d}-m{m}-ls{latent_dim}-{model_type}-kl{kl_weight}",
-            )  # , repo_url="https://huggingface.co/BasStein/doe2vec-d2-m8-ls16")
+               obj.autoencoder,
+               f"doe2vec-d{d}-m{m}-ls{latent_dim}-{model_type}-kl{kl_weight}",
+            )
             dataset.push_to_hub(
-                f"doe2vec-d{d}-m{m}-ls{latent_dim}-{model_type}-kl{kl_weight}"
+               f"doe2vec-d{d}-m{m}-ls{latent_dim}-{model_type}-kl{kl_weight}"
             )
             readme = f"""---
 language:
@@ -59,7 +59,7 @@ tags:
 - exploratory-landscape-analysis
 - autoencoders
 datasets:
-- doe2vec-d{d}-m{m}-ls{latent_dim}-{model_type}-kl{kl_weight}
+- BasStein/doe2vec-d{d}-m{m}-ls{latent_dim}-{model_type}-kl{kl_weight}
 metrics:
 - mse
 co2_eq_emissions:
