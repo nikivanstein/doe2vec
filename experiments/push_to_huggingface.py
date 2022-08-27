@@ -30,25 +30,27 @@ for d in [2]:
                 obj.compile()
                 obj.fit(100)
                 obj.save("../models/")
-            data = np.load(
-               f"{dir}/data_{d}-{m}-{latent_dim}-{seed}-{model_type}{kl_weight}.npy"
-            )
-            functions = np.load(
-               f"{dir}/functions_{d}-{m}-{latent_dim}-{seed}-{model_type}{kl_weight}.npy"
-            )
-            datadict = {
-               "y": data[:250000],
-               "function": functions,
-               "array_x": [obj.sample] * len(functions),
-            }
-            dataset = Dataset.from_dict(datadict)
+            if False: #TODO push dataset to different name, only depends on dim and size
+                data = np.load(
+                f"{dir}/data_{d}-{m}-{latent_dim}-{seed}-{model_type}{kl_weight}.npy"
+                )
+                functions = np.load(
+                f"{dir}/functions_{d}-{m}-{latent_dim}-{seed}-{model_type}{kl_weight}.npy"
+                )
+                datadict = {
+                "y": data[:250000],
+                "function": functions,
+                "array_x": [obj.sample] * len(functions),
+                }
+                dataset = Dataset.from_dict(datadict)
+                dataset.push_to_hub(
+                    f"doe2vec-d{d}-m{m}-ls{latent_dim}-{model_type}-kl{kl_weight}"
+                )
             push_to_hub_keras(
                obj.autoencoder,
                f"doe2vec-d{d}-m{m}-ls{latent_dim}-{model_type}-kl{kl_weight}",
             )
-            dataset.push_to_hub(
-               f"doe2vec-d{d}-m{m}-ls{latent_dim}-{model_type}-kl{kl_weight}"
-            )
+            
             readme = f"""---
 language:
 - en
