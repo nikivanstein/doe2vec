@@ -49,6 +49,8 @@ def plot_confusion_matrix(y_test, y_scores, classNames, title="confusion_matrix"
 
 ela = pd.read_excel('featELA_BBOB_original.xlsx', index_col=0)
 ela = ela.fillna(0)
+ela.apply(lambda x: (x - x.min()) / (x.max() - x.min()), axis=1)
+
 #print(ela.Response1.values)
 
 #for column in ela.columns[:]:

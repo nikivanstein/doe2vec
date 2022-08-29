@@ -15,7 +15,7 @@ import bbobbenchmarks as bbob
 from doe2vec import doe_model
 import pandas as pd
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib import cm
@@ -60,17 +60,17 @@ f1s = []
 f1s_elas = []
 calc_ela = False
 all_dims = [2,5,10,15,20,30,40]
-latent_dim = 24
+latent_dim = 8
 for dim in all_dims:
 
     obj = doe_model(
         dim, 8, n=250000, latent_dim=latent_dim, use_mlflow=False, model_type="VAE", kl_weight=0.001
     )
     
-    if not obj.loadData("../../models/"):
-        obj.generateData()
-        obj.saveData("../../models/")
     if not obj.loadModel("../../models/"):
+        if not obj.loadData("../../models/"):
+            obj.generateData()
+            obj.saveData("../../models/")
         tracker = EmissionsTracker(project_name=f"doe2vec-d{dim}", output_dir="../../models/")
         tracker.start()
         obj.compile()

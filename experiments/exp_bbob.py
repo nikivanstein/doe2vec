@@ -69,7 +69,7 @@ def createSurfacePlot(bbob_fun, gen_fun, name="bbobx", title="f_x"):
 obj = doe_model(
     2, 8, n=1000000, latent_dim=16, model_type="VAE", kl_weight=0.001, use_mlflow=False
 )
-if not obj.load("../models"):
+if not obj.loadModel("../models"):
     obj.generateData()
     obj.compile()
     obj.fit(100)

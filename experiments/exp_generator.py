@@ -35,7 +35,7 @@ def generateMovie(f, i, model_type, latent_size, frn=50):
         model_type=model_type,
         kl_weight=0.001,
     )
-    if not obj.load("../models/"):
+    if not obj.loadModel("../models/"):
         obj.generateData()
         obj.compile()
         obj.fit(100)
