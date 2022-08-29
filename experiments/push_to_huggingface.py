@@ -9,43 +9,39 @@ import tensorflow as tf
 
 model_type = "VAE"
 kl_weight = 0.001
+n = 250000
 seed = 0
 dir = "../models"
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 tf.config.experimental.enable_tensor_float_32_execution(False)
 for d in [2]:
+    #push data
+    functions = np.load(
+        f"{dir}/functions_d{d}-n{n}.npy"
+    )
+    datadict = {
+        "function": functions,
+    }
+    dataset = Dataset.from_dict(datadict)
+    dataset.push_to_hub(
+        f"{n}-randomfunctions-{d}d"
+    )
     for m in [8]:
         for latent_dim in [24]:
             obj = doe_model(
                 d,
                 m,
-                n=d * 50000,
+                n=250000,
                 latent_dim=latent_dim,
                 kl_weight=kl_weight,
                 use_mlflow=False,
             )
-            if not obj.load("../models/"):
+            if not obj.loadModel("../models/"):
                 obj.generateData()
                 obj.compile()
                 obj.fit(100)
                 obj.save("../models/")
-            if False: #TODO push dataset to different name, only depends on dim and size
-                data = np.load(
-                f"{dir}/data_{d}-{m}-{latent_dim}-{seed}-{model_type}{kl_weight}.npy"
-                )
-                functions = np.load(
-                f"{dir}/functions_{d}-{m}-{latent_dim}-{seed}-{model_type}{kl_weight}.npy"
-                )
-                datadict = {
-                "y": data[:250000],
-                "function": functions,
-                "array_x": [obj.sample] * len(functions),
-                }
-                dataset = Dataset.from_dict(datadict)
-                dataset.push_to_hub(
-                    f"doe2vec-d{d}-m{m}-ls{latent_dim}-{model_type}-kl{kl_weight}"
-                )
             push_to_hub_keras(
                obj.autoencoder,
                f"doe2vec-d{d}-m{m}-ls{latent_dim}-{model_type}-kl{kl_weight}",
@@ -61,7 +57,7 @@ tags:
 - exploratory-landscape-analysis
 - autoencoders
 datasets:
-- BasStein/doe2vec-d{d}-m{m}-ls{latent_dim}-{model_type}-kl{kl_weight}
+- BasStein/{n}-randomfunctions-{d}d
 metrics:
 - mse
 co2_eq_emissions:
@@ -82,23 +78,26 @@ Example code of loading this huggingface model using the doe2vec package.
 
 First install the package
 
-    pip install doe2vec
+```zsh
+pip install doe2vec
+```
 
 Then import and load the model.
 
+```python
+from doe2vec import doe_model
 
-    from doe2vec import doe_model
-
-    obj = doe_model(
-        {d},
-        {m},
-        latent_dim={latent_dim},
-        kl_weight={kl_weight},
-        model_type="{model_type}"
-    )
-    obj.load_from_huggingface()
-    #test the model
-    obj.plot_label_clusters_bbob()
+obj = doe_model(
+    {d},
+    {m},
+    latent_dim={latent_dim},
+    kl_weight={kl_weight},
+    model_type="{model_type}"
+)
+obj.load_from_huggingface()
+#test the model
+obj.plot_label_clusters_bbob()
+```
 
 ## Intended uses & limitations
 
@@ -110,6 +109,9 @@ The representations can then be used for downstream tasks such as automatic opti
 
 The model is trained using a weighed KL loss and mean squared error reconstruction loss.
 The model is trained using 250.000 randomly generated functions (see the dataset) over 100 epochs.
+
+- **Hardware:** 1x Tesla T4 GPU
+- **Optimizer:** Adam
 
 """
             text_file = open("README.md", "wt")
