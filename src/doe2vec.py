@@ -1,13 +1,15 @@
 import os.path
+import sys
 from statistics import mode
 
 import matplotlib.pyplot as plt
 import mlflow
-import sys
 import mlflow.tensorflow
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+from datasets import load_dataset
+from huggingface_hub import from_pretrained_keras
 from matplotlib import cm
 from mpl_toolkits import mplot3d
 from numpy.random import seed
@@ -18,8 +20,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.neighbors import NearestNeighbors
 from tensorflow.keras import layers, losses
 from tensorflow.keras.models import Model
-from datasets import load_dataset
-from huggingface_hub import from_pretrained_keras
 
 import bbobbenchmarks as bbob
 from models import VAE, Autoencoder
@@ -40,7 +40,7 @@ class doe_model:
         custom_sample=None,
         use_mlflow=False,
         mlflow_name="Doc2Vec",
-        model_type="VAE"
+        model_type="VAE",
     ):
         """Doe2Vec model to transform Design of Experiments to feature vectors.
 
@@ -104,7 +104,9 @@ class doe_model:
         self.autoencoder.compile(optimizer="adam")
         self.functions = dataset["function"]
         self.Y = []
-        array_x = self.sample #this seemingly unused variable is required by the eval() later on
+        array_x = (
+            self.sample
+        )  # this seemingly unused variable is required by the eval() later on
         for fun in self.functions:
             try:
                 array_y = eval(fun)
@@ -142,8 +144,6 @@ class doe_model:
             return True
         return False
 
-        
-
     def loadData(self, dir="data"):
         """Load a stored functions file and retrieve all the landscapes.
 
@@ -153,16 +153,15 @@ class doe_model:
         Returns:
             bool: True if loaded, else False.
         """
-        if os.path.exists(
-            f"{dir}/functions_d{self.dim}-n{self.n}.npy"
-        ):
-            self.functions = np.load(
-                f"{dir}/functions_d{self.dim}-n{self.n}.npy"
-            )
+        if os.path.exists(f"{dir}/functions_d{self.dim}-n{self.n}.npy"):
+            self.functions = np.load(f"{dir}/functions_d{self.dim}-n{self.n}.npy")
             self.Y = []
-            array_x = self.sample #this seemingly unused variable is required by the eval() later on
+            array_x = (
+                self.sample
+            )  # this seemingly unused variable is required by the eval() later on
             if not sys.warnoptions:
                 import warnings
+
                 warnings.simplefilter("ignore")
             for fun in self.functions:
                 try:
@@ -231,7 +230,7 @@ class doe_model:
         self.functions = np.array(self.functions)
         self.train_data = tf.cast(self.Y[:-50], tf.float32)
         self.test_data = tf.cast(self.Y[-50:], tf.float32)
-        
+
         return self.Y
 
     def setData(self, Y):
@@ -261,7 +260,7 @@ class doe_model:
         Args:
             epochs (int, optional): Number of epochs to train. Defaults to 100.
         """
-        if (self.autoencoder is None):
+        if self.autoencoder is None:
             raise AttributeError("Autoencoder model is not compiled yet")
         if self.use_mlflow:
             mlflow.tensorflow.autolog(every_n_iter=1)
@@ -337,9 +336,7 @@ class doe_model:
         Args:
             data_dir (str, optional): Directory to store the random functions. Defaults to "data".
         """
-        np.save(
-            f"{data_dir}/functions_d{self.dim}-n{self.n}.npy", self.functions
-        )   
+        np.save(f"{data_dir}/functions_d{self.dim}-n{self.n}.npy", self.functions)
 
     def encode(self, X):
         """Encode a Design of Experiments.
