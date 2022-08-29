@@ -1,4 +1,8 @@
 import os
+import sys
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter("ignore")
 
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
@@ -11,7 +15,7 @@ import bbobbenchmarks as bbob
 from doe2vec import doe_model
 import pandas as pd
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib import cm
@@ -54,11 +58,13 @@ def plot_confusion_matrix(y_test, y_scores, classNames, title="confusion_matrix"
 """
 f1s = []
 f1s_elas = []
-calc_ela = True
-for dim in [2,5,10]:#,15,20,30,40
+calc_ela = False
+all_dims = [2,5,10,15,20,30,40]
+latent_dim = 24
+for dim in all_dims:
 
     obj = doe_model(
-        dim, 8, n=250000, latent_dim=24, use_mlflow=False, model_type="VAE", kl_weight=0.001
+        dim, 8, n=250000, latent_dim=latent_dim, use_mlflow=False, model_type="VAE", kl_weight=0.001
     )
     
     if not obj.loadData("../../models/"):
@@ -198,8 +204,10 @@ for dim in [2,5,10]:#,15,20,30,40
     X_test = X[-test_size:]
 
     automl = autosklearn.classification.AutoSklearnClassifier(
-        time_left_for_this_task=120,
+        time_left_for_this_task=240,
         per_run_time_limit=30,
+        n_jobs=1,
+        memory_limit=None
     )
     automl.fit(X_train, y_1[:-test_size], dataset_name='y1 doe2vec')
     resRf = automl.predict(X_test)
@@ -207,8 +215,10 @@ for dim in [2,5,10]:#,15,20,30,40
     f1s.append(f1_macro_rf)
 
     automl = autosklearn.classification.AutoSklearnClassifier(
-        time_left_for_this_task=120,
+        time_left_for_this_task=240,
         per_run_time_limit=30,
+        n_jobs=1,
+        memory_limit=None
     )
     automl.fit(X_train, y_2[:-test_size], dataset_name='y2 doe2vec')
     resRf = automl.predict(X_test)
@@ -216,8 +226,10 @@ for dim in [2,5,10]:#,15,20,30,40
     f1s.append(f1_macro_rf)
 
     automl = autosklearn.classification.AutoSklearnClassifier(
-        time_left_for_this_task=120,
+        time_left_for_this_task=240,
         per_run_time_limit=30,
+        n_jobs=1,
+        memory_limit=None
     )
     automl.fit(X_train, y_3[:-test_size], dataset_name='y3 doe2vec')
     resRf = automl.predict(X_test)
@@ -264,11 +276,17 @@ for dim in [2,5,10]:#,15,20,30,40
 
         print(dim, f1s_elas)
 
-print(f1s)
+i = 0
+for d in all_dims:
+    print(d, f1s[i])
+    print(d, f1s[i+1])
+    print(d, f1s[i+2])
+    i+=1
+
 if calc_ela:
     print(f1s_elas)
     np.save("f1_ela.npy",f1s_elas)
-np.save(f"f1_VAE.npy", f1s)
+np.save(f"f1_VAE-{latent_dim}.npy", f1s)
 
 
 
