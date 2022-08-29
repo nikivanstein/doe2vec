@@ -3,8 +3,9 @@
 
 import pytest
 import os
+
 from .doe2vec import doe_model
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 
 def test_happy_path():
@@ -24,7 +25,7 @@ def test_load_from_folder():
     model = doe_model(
         2,
         8,
-        n=50000,
+        n=200,
         latent_dim=24,
         kl_weight=0.001
     )
@@ -35,8 +36,8 @@ def test_load_from_huggingface():
     model = doe_model(
         2,
         8,
-        n=50000,
-        latent_dim=16,
+        n=250000,
+        latent_dim=24,
         kl_weight=0.001,
     )
     model.load_from_huggingface()

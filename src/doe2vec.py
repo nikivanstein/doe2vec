@@ -3,6 +3,7 @@ from statistics import mode
 
 import matplotlib.pyplot as plt
 import mlflow
+import sys
 import mlflow.tensorflow
 import numpy as np
 import pandas as pd
@@ -32,7 +33,7 @@ class doe_model:
         self,
         dim,
         m,
-        n=100000,
+        n=250000,
         latent_dim=32,
         seed_nr=0,
         kl_weight=0.001,
@@ -160,6 +161,9 @@ class doe_model:
             )
             self.Y = []
             array_x = self.sample #this seemingly unused variable is required by the eval() later on
+            if not sys.warnoptions:
+                import warnings
+                warnings.simplefilter("ignore")
             for fun in self.functions:
                 try:
                     array_y = eval(fun)
@@ -171,6 +175,7 @@ class doe_model:
                     self.Y.append(array_y)
                 except:
                     continue
+            warnings.simplefilter("default")
             self.setData(self.Y)
             print("Loaded data")
             return True
