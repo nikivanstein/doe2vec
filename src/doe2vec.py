@@ -1,5 +1,6 @@
 import os.path
 import sys
+import warnings
 from statistics import mode
 
 import matplotlib.pyplot as plt
@@ -107,6 +108,8 @@ class doe_model:
         array_x = (
             self.sample
         )  # this seemingly unused variable is required by the eval() later on
+        if not sys.warnoptions:
+            warnings.simplefilter("ignore")
         for fun in self.functions:
             try:
                 array_y = eval(fun)
@@ -118,6 +121,7 @@ class doe_model:
                 self.Y.append(array_y)
             except:
                 continue
+        warnings.simplefilter("default")
         self.setData(self.Y)
         print("Loaded huggingface model and data")
         self.summary()
@@ -160,8 +164,6 @@ class doe_model:
                 self.sample
             )  # this seemingly unused variable is required by the eval() later on
             if not sys.warnoptions:
-                import warnings
-
                 warnings.simplefilter("ignore")
             for fun in self.functions:
                 try:
@@ -198,6 +200,8 @@ class doe_model:
         self.Y = []
         self.functions = []
         tries = 0
+        if not sys.warnoptions:
+            warnings.simplefilter("ignore")
         while len(self.Y) < self.n:
             tries += 1
             # create an artificial function
@@ -226,6 +230,7 @@ class doe_model:
                 self.Y.append(array_y)
             except:
                 continue
+        warnings.simplefilter("default")
         self.Y = np.array(self.Y)
         self.functions = np.array(self.functions)
         self.train_data = tf.cast(self.Y[:-50], tf.float32)
