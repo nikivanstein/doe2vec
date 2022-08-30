@@ -59,12 +59,12 @@ def plot_confusion_matrix(y_test, y_scores, classNames, title="confusion_matrix"
 f1s = []
 f1s_elas = []
 calc_ela = False
-all_dims = [2,5,10,15]
+all_dims = [2,5,10,20,40]
 latent_dim = 8
 for dim in all_dims:
 
     obj = doe_model(
-        dim, 8, n=250000, latent_dim=latent_dim, use_mlflow=False, model_type="VAE", kl_weight=0.001
+        dim, 32, n=250000, latent_dim=latent_dim, use_mlflow=False, model_type="VAE", kl_weight=0.001
     )
     
     if not obj.loadModel("../../models/"):
@@ -74,7 +74,7 @@ for dim in all_dims:
         tracker = EmissionsTracker(project_name=f"doe2vec-d{dim}", output_dir="../../models/")
         tracker.start()
         obj.compile()
-        obj.fit(100)
+        obj.fit(100, verbose=0)
         tracker.stop()
         obj.saveModel("../../models/")
     #obj.plot_label_clusters_bbob()
