@@ -47,10 +47,12 @@ def plot_confusion_matrix(y_test, y_scores, classNames, title="confusion_matrix"
     df.figure.savefig(title)
 
 
-ela = pd.read_excel('featELA_BBOB_original.xlsx', index_col=0)
-ela = ela.fillna(0)
-ela.apply(lambda x: (x - x.min()) / (x.max() - x.min()), axis=1)
+ela = pd.read_excel('ela/CEOELA_results/d2/featELA_d2_original.xlsx', index_col=0)
 
+print(ela.Response1.values)
+ela = ela.apply(lambda x: (x - x.min()) / (x.max() - x.min()), axis=1)
+ela = ela.fillna(0)
+print(ela.Response1.values)
 #print(ela.Response1.values)
 
 #for column in ela.columns[:]:
@@ -60,8 +62,9 @@ encodings = []
 fuction_groups = []
 fuction_nrs = []
 response = 1
-for f in range(1, 25):
-    for i in range(50):
+
+for i in range(100):
+    for f in range(1, 25):
         encodings.append(ela[f"Response{response}"].values)
         response += 1
         class_label = 0
@@ -86,17 +89,17 @@ print(X.shape, y.shape)
 print(np.unique(fuction_groups))
 # y_dense = LabelBinarizer().fit_transform(y)
 
-rf = RandomForestClassifier(n_estimators=100)
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42
-)
+#rf = RandomForestClassifier(n_estimators=100)
+#X_train, X_test, y_train, y_test = train_test_split(
+#    X, y, test_size=0.2, random_state=42
+#)
 
-rf.fit(X_train, y_train)
-resRf = rf.predict(X_test)
+#rf.fit(X_train, y_train)
+#resRf = rf.predict(X_test)
 
-plot_confusion_matrix(
-    y_test, resRf, np.unique(fuction_groups), title="Random Forest Confusion Matrix_ELA"
-)
+#plot_confusion_matrix(
+#    y_test, resRf, np.unique(fuction_groups), title="Random Forest Confusion Matrix_ELA"
+#)
 
 
 X = np.array(encodings)

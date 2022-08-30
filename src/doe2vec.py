@@ -259,11 +259,12 @@ class doe_model:
             self.autoencoder = Autoencoder(self.latent_dim, self.Y.shape[1])
             self.autoencoder.compile(optimizer="adam", loss=losses.MeanSquaredError())
 
-    def fit(self, epochs=100):
+    def fit(self, epochs=100, **kwargs):
         """Fit the autoencoder model.
 
         Args:
             epochs (int, optional): Number of epochs to train. Defaults to 100.
+            **kwargs (dict, optional): optional arguments for the fit procedure.
         """
         if self.autoencoder is None:
             raise AttributeError("Autoencoder model is not compiled yet")
@@ -276,6 +277,7 @@ class doe_model:
                 batch_size=128,
                 shuffle=True,
                 validation_data=(self.test_data, self.test_data),
+                **kwargs,
             )
         else:
             self.autoencoder.fit(
@@ -285,6 +287,7 @@ class doe_model:
                 batch_size=128,
                 shuffle=True,
                 validation_data=(self.test_data, self.test_data),
+                **kwargs,
             )
         self.fitNN()
         if self.use_mlflow:
@@ -376,19 +379,7 @@ class doe_model:
                 )
                 encoded = self.encode([array_x])
                 encodings.append(encoded[0])
-                class_label = 0
-                if f in [1, 2, 3, 4, 5]:
-                    class_label = 1  # "separable"
-                elif f in [6, 7, 8, 9]:
-                    class_label = 2  # "low cond."
-                elif f in [10, 11, 12, 13, 14]:
-                    class_label = 3  # "high cond."
-                elif f in [15, 16, 17, 18, 19]:
-                    class_label = 4  # "multi modal gl."
-                elif f in [20, 21, 22, 23, 24]:
-                    class_label = 5  # "multi modal"
-
-                fuction_groups.append(class_label)
+                fuction_groups.append(f)
 
         X = np.array(encodings)
         y = np.array(fuction_groups).flatten()
@@ -410,7 +401,7 @@ class doe_model:
             mlflow.log_artifact("latent_space.png", "img")
         else:
             plt.savefig(
-                f"../mds/plot_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}.png"
+                f"latent_space_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}.png"
             )
 
     def visualizeTestData(self, n=5):
