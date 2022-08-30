@@ -5,6 +5,7 @@ if not sys.warnoptions:
     warnings.simplefilter("ignore")
 
 import numpy as np
+from sklearn import manifold
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier
@@ -60,11 +61,11 @@ f1s = []
 f1s_elas = []
 calc_ela = False
 all_dims = [2,5,10,20,40]
-latent_dim = 8
+latent_dim = 24
 for dim in all_dims:
 
     obj = doe_model(
-        dim, 32, n=250000, latent_dim=latent_dim, use_mlflow=False, model_type="VAE", kl_weight=0.001
+        dim, 8, n=250000, latent_dim=latent_dim, use_mlflow=False, model_type="VAE", kl_weight=0.001
     )
     
     if not obj.loadModel("../../models/"):
@@ -155,7 +156,8 @@ for dim in all_dims:
     y_3 = np.array(funnel_label).flatten()
 
     #write DOE data for ELA to excel
-    
+    print("old",X.shape) 
+    fuction_nrs = []
     test_size = 20*25
     if calc_ela:
         input_names = []
@@ -183,56 +185,66 @@ for dim in all_dims:
             df_kpi.to_excel(writer, sheet_name='KPI',index=False)
             df_bounds.to_excel(writer, sheet_name='Bounds',index=False)
             df_doe.to_excel(writer, sheet_name='DOE_1',index=False)
-
-        #if dim > 40:
-        #check file exist(later)
         run_ELA(f'ela-d{dim}.xlsx', f'd{dim}')
 
 
-        ela = pd.read_excel(f'CEOELA_results/d{dim}/featELA_d{dim}_original.xlsx', index_col=0)
-        ela = ela.fillna(0)
-        ela_encodings = []
-        response = 1
-        for i in range(120):
-            for f in range(1, 25):
-                ela_encodings.append(ela[f"Response{response}"].values)
-                response+=1
-        ela_X = np.array(ela_encodings)
-
+    ela = pd.read_excel(f'CEOELA_results/d{dim}/featELA_d{dim}_original.xlsx', index_col=0)
+    #normalize
+    ela = ela.apply(lambda x: (x - x.min()) / (x.max() - x.min()), axis=1)
+    ela = ela.fillna(0)
+    ela_encodings = []
+    ela_plus_encodings = []
+    response = 1
     
+    for i in range(120):
+        for f in range(1, 25):
+            features = list(X[response-1])
+            features.extend(list(ela[f"Response{response}"].values))
+            ela_encodings.append(ela[f"Response{response}"].values)
+            #add ela encodings to X
+            ela_plus_encodings.append(features)
+            if i < 100:
+                fuction_nrs.append(f)
+            response+=1
+    ela_X = np.array(ela_encodings)
+    X = np.array(ela_plus_encodings)
+
+    print("new", X.shape)    
     X_train = X[:-test_size]
     X_test = X[-test_size:]
 
-    automl = autosklearn.classification.AutoSklearnClassifier(
-        time_left_for_this_task=240,
-        per_run_time_limit=30,
-        n_jobs=1,
-        memory_limit=None
+
+    colors = np.array(fuction_nrs).flatten()
+    mds = manifold.MDS(
+        n_components=2,
+        random_state=0,
     )
-    automl.fit(X_train, y_1[:-test_size], dataset_name='y1 doe2vec')
-    resRf = automl.predict(X_test)
+    embedding = mds.fit_transform(X_train).T
+    # display a 2D plot of the bbob functions in the latent space
+
+    plt.figure(figsize=(12, 10))
+    plt.scatter(embedding[0], embedding[1], c=colors, cmap=cm.jet)
+    plt.colorbar()
+    plt.xlabel("")
+    plt.ylabel("")
+
+    plt.savefig(f"latent_space_ela_extra_{dim}.png")
+
+    rf = RandomForestClassifier(n_estimators=100)
+    rf.fit(X_train, y_1[:-test_size])
+    resRf = rf.predict(X_test)
     f1_macro_rf = f1_score(y_1[-test_size:], resRf, average='macro')
     f1s.append(f1_macro_rf)
 
-    automl = autosklearn.classification.AutoSklearnClassifier(
-        time_left_for_this_task=240,
-        per_run_time_limit=30,
-        n_jobs=1,
-        memory_limit=None
-    )
-    automl.fit(X_train, y_2[:-test_size], dataset_name='y2 doe2vec')
-    resRf = automl.predict(X_test)
+    rf = RandomForestClassifier(n_estimators=100)
+    rf.fit(X_train, y_2[:-test_size])
+    resRf = rf.predict(X_test)
     f1_macro_rf = f1_score(y_2[-test_size:], resRf, average='macro')
     f1s.append(f1_macro_rf)
 
-    automl = autosklearn.classification.AutoSklearnClassifier(
-        time_left_for_this_task=240,
-        per_run_time_limit=30,
-        n_jobs=1,
-        memory_limit=None
-    )
-    automl.fit(X_train, y_3[:-test_size], dataset_name='y3 doe2vec')
-    resRf = automl.predict(X_test)
+    rf = RandomForestClassifier(n_estimators=100)
+    rf.fit(X_train, y_3[:-test_size])
+    resRf = rf.predict(X_test)
     f1_macro_rf = f1_score(y_3[-test_size:], resRf, average='macro')
     f1s.append(f1_macro_rf)
 
@@ -242,39 +254,6 @@ for dim in all_dims:
     
     print(dim, f1s)
 
-    if calc_ela:
-        #ELA model
-        X_ela_train = ela_X[:-test_size]
-        X_ela_test = ela_X[-test_size:]
-
-        automl = autosklearn.classification.AutoSklearnClassifier(
-            time_left_for_this_task=120,
-            per_run_time_limit=30,
-        )
-        automl.fit(X_ela_train, y_1[:-test_size], dataset_name='y1 ela')
-        resRf = automl.predict(X_ela_test)
-        f1_macro_rf_ela = f1_score(y_1[-test_size:], resRf, average='macro')
-        f1s_elas.append(f1_macro_rf_ela)
-
-        automl = autosklearn.classification.AutoSklearnClassifier(
-            time_left_for_this_task=120,
-            per_run_time_limit=30,
-        )
-        automl.fit(X_ela_train, y_2[:-test_size], dataset_name='y2 ela')
-        resRf = automl.predict(X_ela_test)
-        f1_macro_rf_ela = f1_score(y_2[-test_size:], resRf, average='macro')
-        f1s_elas.append(f1_macro_rf_ela)
-
-        automl = autosklearn.classification.AutoSklearnClassifier(
-            time_left_for_this_task=120,
-            per_run_time_limit=30,
-        )
-        automl.fit(X_ela_train, y_3[:-test_size], dataset_name='y3 ela')
-        resRf = automl.predict(X_ela_test)
-        f1_macro_rf_ela = f1_score(y_3[-test_size:], resRf, average='macro')
-        f1s_elas.append(f1_macro_rf_ela)
-
-        print(dim, f1s_elas)
 
 i = 0
 for d in all_dims:
@@ -283,10 +262,8 @@ for d in all_dims:
     print(d, f1s[i+2])
     i+=1
 
-if calc_ela:
-    print(f1s_elas)
-    np.save("f1_ela.npy",f1s_elas)
-np.save(f"f1_VAE-{latent_dim}.npy", f1s)
+
+np.save(f"f1_VAE_ELA-{latent_dim}.npy", f1s)
 
 
 

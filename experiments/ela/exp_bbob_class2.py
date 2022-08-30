@@ -66,7 +66,7 @@ for model_type in ["AE", "VAE"]:
         f1_results[model_type+str(latent_dim)] = {}
         for dim in all_dims:
             obj = doe_model(
-                dim, 8, n=250000, latent_dim=latent_dim, use_mlflow=False, model_type=model_type, kl_weight=0.001
+                dim, 9, n=250000, latent_dim=latent_dim, use_mlflow=False, model_type=model_type, kl_weight=0.001
             )
             
             sample = obj.sample * 10 - 5
@@ -148,36 +148,22 @@ for model_type in ["AE", "VAE"]:
             X_train = X[:-test_size]
             X_test = X[-test_size:]
 
-            automl = autosklearn.classification.AutoSklearnClassifier(
-                time_left_for_this_task=240,
-                per_run_time_limit=30,
-                n_jobs=1,
-                memory_limit=None
-            )
-            automl.fit(X_train, y_1[:-test_size], dataset_name='y1 doe2vec')
-            resRf = automl.predict(X_test)
+            rf = RandomForestClassifier(n_estimators=100)
+            rf.fit(X_train, y_1[:-test_size])
+
+            resRf = rf.predict(X_test)
             f1_macro = f1_score(y_1[-test_size:], resRf, average='macro')
             f1_results[model_type+str(latent_dim)][f"d{dim} multimodal"] = f1_macro
 
-            automl = autosklearn.classification.AutoSklearnClassifier(
-                time_left_for_this_task=240,
-                per_run_time_limit=30,
-                n_jobs=1,
-                memory_limit=None
-            )
-            automl.fit(X_train, y_2[:-test_size], dataset_name='y2 doe2vec')
-            resRf = automl.predict(X_test)
+            rf = RandomForestClassifier(n_estimators=100)
+            rf.fit(X_train, y_2[:-test_size])
+            resRf = rf.predict(X_test)
             f1_macro = f1_score(y_2[-test_size:], resRf, average='macro')
             f1_results[model_type+str(latent_dim)][f"d{dim} global"] = f1_macro
 
-            automl = autosklearn.classification.AutoSklearnClassifier(
-                time_left_for_this_task=240,
-                per_run_time_limit=30,
-                n_jobs=1,
-                memory_limit=None
-            )
-            automl.fit(X_train, y_3[:-test_size], dataset_name='y3 doe2vec')
-            resRf = automl.predict(X_test)
+            rf = RandomForestClassifier(n_estimators=100)
+            rf.fit(X_train, y_3[:-test_size])
+            resRf = rf.predict(X_test)
             f1_macro = f1_score(y_3[-test_size:], resRf, average='macro')
             f1_results[model_type+str(latent_dim)][f"d{dim} funnel"] = f1_macro
 
