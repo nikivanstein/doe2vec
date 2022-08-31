@@ -60,18 +60,18 @@ def plot_confusion_matrix(y_test, y_scores, classNames, title="confusion_matrix"
 f1s = []
 f1s_elas = []
 calc_ela = False
-all_dims = [2,5,10,20,40]
+all_dims = [40]
 latent_dim = 24
 for dim in all_dims:
 
     obj = doe_model(
-        dim, 8, n=250000, latent_dim=latent_dim, use_mlflow=False, model_type="VAE", kl_weight=0.001
+        dim, 8, n=100000, latent_dim=latent_dim, use_mlflow=False, model_type="VAE", kl_weight=0.001
     )
     
     if not obj.loadModel("../../models/"):
         if not obj.loadData("../../models/"):
             obj.generateData()
-            obj.saveData("../../models/")
+            #obj.saveData("../../models/")
         tracker = EmissionsTracker(project_name=f"doe2vec-d{dim}", output_dir="../../models/")
         tracker.start()
         obj.compile()
@@ -190,8 +190,10 @@ for dim in all_dims:
 
     ela = pd.read_excel(f'CEOELA_results/d{dim}/featELA_d{dim}_original.xlsx', index_col=0)
     #normalize
+    print("all_ela_size", len(ela["Response1"].values))
     ela = ela.apply(lambda x: (x - x.min()) / (x.max() - x.min()), axis=1)
-    ela = ela.fillna(0)
+    ela = ela.dropna()#remove all features with a NaN (this includes constant features)
+    print("ela_size", len(ela["Response1"].values))
     ela_encodings = []
     ela_plus_encodings = []
     response = 1
@@ -208,11 +210,12 @@ for dim in all_dims:
             response+=1
     ela_X = np.array(ela_encodings)
     X = np.array(ela_plus_encodings)
-
-    print("new", X.shape)    
+ 
     X_train = X[:-test_size]
     X_test = X[-test_size:]
 
+    X_ela_train = ela_X[:-test_size]
+    X_ela_test = ela_X[-test_size:]
 
     colors = np.array(fuction_nrs).flatten()
     mds = manifold.MDS(
@@ -248,6 +251,27 @@ for dim in all_dims:
     f1_macro_rf = f1_score(y_3[-test_size:], resRf, average='macro')
     f1s.append(f1_macro_rf)
 
+
+    #ELA only
+
+    if False:
+        rf = RandomForestClassifier(n_estimators=100)
+        rf.fit(X_ela_train, y_1[:-test_size])
+        resRf = rf.predict(X_ela_test)
+        f1_macro_rf = f1_score(y_1[-test_size:], resRf, average='macro')
+        f1s.append(f1_macro_rf)
+
+        rf = RandomForestClassifier(n_estimators=100)
+        rf.fit(X_ela_train, y_2[:-test_size])
+        resRf = rf.predict(X_ela_test)
+        f1_macro_rf = f1_score(y_2[-test_size:], resRf, average='macro')
+        f1s.append(f1_macro_rf)
+
+        rf = RandomForestClassifier(n_estimators=100)
+        rf.fit(X_ela_train, y_3[:-test_size])
+        resRf = rf.predict(X_ela_test)
+        f1_macro_rf = f1_score(y_3[-test_size:], resRf, average='macro')
+        f1s.append(f1_macro_rf)
     #plot_confusion_matrix(
     #    y_test, resRf, np.unique(fuction_groups), title=f"Random Forest Confusion Matrix VAE d{dim}"
     #)
