@@ -29,14 +29,15 @@ def generateMovie(f, i, model_type, latent_size, frn=50):
     obj = doe_model(
         2,
         8,
-        n=20000,
+        n=250000,
         latent_dim=latent_size,
         use_mlflow=False,
         model_type=model_type,
         kl_weight=0.001,
     )
     if not obj.loadModel("../models/"):
-        obj.generateData()
+        if not obj.loadData("../models/"):
+            obj.generateData()
         obj.compile()
         obj.fit(100)
         obj.save("../models/")
@@ -143,12 +144,12 @@ def generateMovie(f, i, model_type, latent_size, frn=50):
     # plt.show()
 
     fn = f"gifs/{model_type}_2d_reconstruction_{latent_size}_f{f}_i{i}"
-    ani.save(fn + ".mp4", writer="ffmpeg", fps=fps)
-    # ani.save(fn+'.gif',writer='imagemagick',fps=fps)
+    #ani.save(fn + ".mp4", writer="ffmpeg", fps=fps)
+    ani.save(fn+'.gif',writer='imagemagick',fps=fps)
 
 
 i = 0
 for latent_size in [4]:  # 8
     for f in [22]:  # 11,12,13,14,15,24
-        for model_type in ["AE"]:  # , "AE"
-            generateMovie(f, i, model_type, latent_size, frn=120)
+        for model_type in ["VAE","AE"]:  # , "AE"
+            generateMovie(f, i, model_type, latent_size, frn=60)

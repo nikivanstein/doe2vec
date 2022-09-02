@@ -2,10 +2,10 @@
 
 
 ## doe_model
-[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L30)
+[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L32)
 ```python 
 doe_model(
-   dim, m, n = 100000, latent_dim = 32, seed_nr = 0, kl_weight = 0.001,
+   dim, m, n = 250000, latent_dim = 32, seed_nr = 0, kl_weight = 0.001,
    custom_sample = None, use_mlflow = False, mlflow_name = 'Doc2Vec',
    model_type = 'VAE'
 )
@@ -18,7 +18,7 @@ doe_model(
 
 
 ### .load_from_huggingface
-[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L93)
+[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L95)
 ```python
 .load_from_huggingface(
    repo = 'BasStein'
@@ -35,7 +35,7 @@ Load a pre-trained model from a HuggingFace repository.
 
 
 ### .loadModel
-[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L124)
+[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L131)
 ```python
 .loadModel(
    dir = 'models'
@@ -57,7 +57,7 @@ Load a pre-trained Doe2vec model.
 
 
 ### .loadData
-[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L146)
+[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L151)
 ```python
 .loadData(
    dir = 'data'
@@ -79,7 +79,7 @@ Load a stored functions file and retrieve all the landscapes.
 
 
 ### .getSample
-[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L179)
+[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L185)
 ```python
 .getSample()
 ```
@@ -94,7 +94,7 @@ Get the sample DOE used.
 
 
 ### .generateData
-[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L187)
+[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L193)
 ```python
 .generateData()
 ```
@@ -109,7 +109,7 @@ Generate the random functions for training the autoencoder.
 
 
 ### .setData
-[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L232)
+[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L241)
 ```python
 .setData(
    Y
@@ -126,7 +126,7 @@ Helper function to load the data and split in train validation sets.
 
 
 ### .compile
-[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L242)
+[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L251)
 ```python
 .compile()
 ```
@@ -135,10 +135,10 @@ Helper function to load the data and split in train validation sets.
 Compile the autoencoder architecture.
 
 ### .fit
-[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L253)
+[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L262)
 ```python
 .fit(
-   epochs = 100
+   epochs = 100, **kwargs
 )
 ```
 
@@ -149,10 +149,11 @@ Fit the autoencoder model.
 **Args**
 
 * **epochs** (int, optional) : Number of epochs to train. Defaults to 100.
+* **kwargs** (dict, optional) : optional arguments for the fit procedure.
 
 
 ### .fitNN
-[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L286)
+[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L298)
 ```python
 .fitNN()
 ```
@@ -161,7 +162,7 @@ Fit the autoencoder model.
 Fit the neirest neighbour tree to find similar functions.
 
 ### .getNeighbourFunction
-[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L294)
+[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L306)
 ```python
 .getNeighbourFunction(
    features
@@ -183,7 +184,7 @@ Get the closest random generated function depending on a set of features (from a
 
 
 ### .save
-[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L308)
+[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L320)
 ```python
 .save(
    model_dir = 'model', data_dir = 'data'
@@ -201,7 +202,7 @@ Save the model and random functions used for training
 
 
 ### .saveModel
-[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L319)
+[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L331)
 ```python
 .saveModel(
    model_dir
@@ -218,7 +219,7 @@ Save the model
 
 
 ### .saveData
-[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L329)
+[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L341)
 ```python
 .saveData(
    data_dir = 'data'
@@ -235,7 +236,7 @@ Save the random functions used for training
 
 
 ### .encode
-[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L339)
+[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L349)
 ```python
 .encode(
    X
@@ -257,7 +258,7 @@ Encode a Design of Experiments.
 
 
 ### .summary
-[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L356)
+[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L366)
 ```python
 .summary()
 ```
@@ -266,14 +267,14 @@ Encode a Design of Experiments.
 Get a summary of the autoencoder model
 
 ### .plot_label_clusters_bbob
-[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L360)
+[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L370)
 ```python
 .plot_label_clusters_bbob()
 ```
 
 
 ### .visualizeTestData
-[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L409)
+[source](https://github.com/Basvanstein/doe2vec/blob/master/src/doe2vec.py/#L407)
 ```python
 .visualizeTestData(
    n = 5

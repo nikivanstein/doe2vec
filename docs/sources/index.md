@@ -1,4 +1,5 @@
-<h1><img src="logo.png" width="128" style="float:left;"><br/>DoE2Vec</h1>
+<h1><img src="docs/logo.png" width="128" style="float:left;">DoE2Vec</h1>
+
 
 DoE2Vec is a self-supervised approach to learn exploratory landscape analysis features from design of experiments.
 The model can be used for downstream meta-learning tasks such as learninig which optimizer works best on a given optimization landscape.
