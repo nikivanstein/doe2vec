@@ -1,0 +1,16 @@
+site_name: DoE2Vec
+
+
+# Repository
+repo_name: doe2vec
+repo: https://github.com/Basvanstein/doe2vec/
+# Copyright
+copyright: Bas van Stein
+
+#This specifies the autogeneration portion
+pages:
+  - page: "doe2vec/doe_model.md"
+    source: "src/doe2vec.py"
+    classes:
+      - doe_model
+

@@ -1,4 +1,7 @@
 import os.path
+import sys
+import warnings
+from statistics import mode
 
 import matplotlib.pyplot as plt
 import mlflow
@@ -6,6 +9,8 @@ import mlflow.tensorflow
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+from datasets import load_dataset
+from huggingface_hub import from_pretrained_keras
 from matplotlib import cm
 from mpl_toolkits import mplot3d
 from numpy.random import seed
@@ -16,8 +21,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.neighbors import NearestNeighbors
 from tensorflow.keras import layers, losses
 from tensorflow.keras.models import Model
-from datasets import load_dataset
-from huggingface_hub import from_pretrained_keras
 
 import bbobbenchmarks as bbob
 from models import VAE, Autoencoder
@@ -31,10 +34,10 @@ class doe_model:
         self,
         dim,
         m,
-        n=1000,
-        latent_dim=16,
+        n=250000,
+        latent_dim=32,
         seed_nr=0,
-        kl_weight=0.1,
+        kl_weight=0.001,
         custom_sample=None,
         use_mlflow=False,
         mlflow_name="Doc2Vec",
@@ -53,6 +56,7 @@ class doe_model:
             use_mlflow (bool, optional): To use the mlflow backend to log experiments. Defaults to False.
             mlflow_name (str, optional): The name to log the mlflow experiment. Defaults to "Doc2Vec".
             model_type (str, optional): The model to use, either "AE" or "VAE". Defaults to "VAE".
+            use_bbob (bool, optional): To use BBOB functions in addition to random generated functions.
         """
         self.dim = dim
         self.m = m
@@ -62,8 +66,11 @@ class doe_model:
         self.seed = seed_nr
         self.use_VAE = False
         self.model_type = model_type
+        self.fitted = False
+        self.autoencoder = None
         if model_type == "VAE":
             self.use_VAE = True
+            self.pure_model_type = self.model_type
             self.model_type = self.model_type + str(kl_weight)
         seed(self.seed)
         # generate the DOE using Sobol
@@ -85,57 +92,95 @@ class doe_model:
             mlflow.log_param("latent_dim", self.latent_dim)
             mlflow.log_param("seed", self.seed)
 
-    def load_from_huggingface(self, name="BasStein/doe2vec-d2-m8-ls16-VAE-kl0.001"):
+    def load_from_huggingface(self, repo="BasStein"):
         """Load a pre-trained model from a HuggingFace repository.
 
         Args:
-            name (str, optional): the huggingface repo to load. Both dataset and models use a shared name.
+            repo (str, optional): the huggingface repo to load from.
         """
-        dataset = load_dataset(name)["train"]
-        self.autoencoder = from_pretrained_keras(name)
+        model_name = f"{repo}/doe2vec-d{self.dim}-m{self.m}-ls{self.latent_dim}-{self.pure_model_type}-kl{self.kl_weight}"
+        data_name = f"{repo}/{self.n}-randomfunctions-{self.dim}d"
+        dataset = load_dataset(data_name)["train"]
+        self.autoencoder = from_pretrained_keras(model_name)
         self.autoencoder.compile(optimizer="adam")
-        self.sample = dataset["array_x"][0]
-        self.Y = dataset["y"]
         self.functions = dataset["function"]
-        self.train_data = tf.cast(self.Y[:-50], tf.float32)
-        self.test_data = tf.cast(self.Y[-50:], tf.float32)
+        self.Y = []
+        array_x = (
+            self.sample
+        )  # this seemingly unused variable is required by the eval() later on
+        if not sys.warnoptions:
+            warnings.simplefilter("ignore")
+        for fun in self.functions:
+            try:
+                array_y = eval(fun)
+                # normalize the train data (this should be done per row (not per column!))
+                array_y = array_y.flatten()
+                array_y = (array_y - np.min(array_y)) / (
+                    np.max(array_y) - np.min(array_y)
+                )
+                self.Y.append(array_y)
+            except:
+                continue
+        warnings.simplefilter("default")
+        self.setData(self.Y)
         print("Loaded huggingface model and data")
         self.summary()
         self.fitNN()
         return True
 
-    def load(self, dir="models"):
-        """Load a pre-trained Doe2vec model and data.
+    def loadModel(self, dir="models"):
+        """Load a pre-trained Doe2vec model.
 
         Args:
-            dir (str, optional): The directory where the model and data are stored. Defaults to "models".
+            dir (str, optional): The directory where the model is stored. Defaults to "models".
 
         Returns:
             bool: True if loaded, else False.
         """
         if os.path.exists(
-            f"{dir}/sample_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}.npy"
+            f"{dir}/model_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}"
         ):
             self.autoencoder = tf.keras.models.load_model(
                 f"{dir}/model_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}"
             )
-            self.sample = np.load(
-                f"{dir}/sample_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}.npy"
-            )
-            self.Y = np.load(
-                f"{dir}/data_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}.npy"
-            )
-            self.functions = np.load(
-                f"{dir}/functions_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}.npy"
-            )
-            self.train_data = tf.cast(self.Y[:-50], tf.float32)
-            self.test_data = tf.cast(self.Y[-50:], tf.float32)
-            print("Loaded pre-existng model and data")
+            print("Loaded pre-existng model")
             self.summary()
-            self.fitNN()
             return True
-        else:
-            return False
+        return False
+
+    def loadData(self, dir="data"):
+        """Load a stored functions file and retrieve all the landscapes.
+
+        Args:
+            dir (str, optional): The directory where the data are stored. Defaults to "data".
+
+        Returns:
+            bool: True if loaded, else False.
+        """
+        if os.path.exists(f"{dir}/functions_d{self.dim}-n{self.n}.npy"):
+            self.functions = np.load(f"{dir}/functions_d{self.dim}-n{self.n}.npy")
+            self.Y = []
+            array_x = (
+                self.sample
+            )  # this seemingly unused variable is required by the eval() later on
+            if not sys.warnoptions:
+                warnings.simplefilter("ignore")
+            for fun in self.functions:
+                try:
+                    array_y = eval(fun)
+                    # normalize the train data (this should be done per row (not per column!))
+                    array_y = array_y.flatten()
+                    array_y = (array_y - np.min(array_y)) / (
+                        np.max(array_y) - np.min(array_y)
+                    )
+                    self.Y.append(array_y)
+                except:
+                    continue
+            warnings.simplefilter("default")
+            self.setData(self.Y)
+            print("Loaded data")
+            return True
+        return False
 
     def getSample(self):
         """Get the sample DOE used.
@@ -155,10 +200,12 @@ class doe_model:
         self.Y = []
         self.functions = []
         tries = 0
+        if not sys.warnoptions:
+            warnings.simplefilter("ignore")
         while len(self.Y) < self.n:
             tries += 1
             # create an artificial function
-            tree = genTree.generate_tree(6, 12)
+            tree = genTree.generate_tree(6, 16)
             exp = genTree2exp.generate_tree2exp(tree)
             fun = genExp2fun.generate_exp2fun(
                 exp, len(self.sample), self.sample.shape[1]
@@ -183,10 +230,12 @@ class doe_model:
                 self.Y.append(array_y)
             except:
                 continue
+        warnings.simplefilter("default")
         self.Y = np.array(self.Y)
         self.functions = np.array(self.functions)
         self.train_data = tf.cast(self.Y[:-50], tf.float32)
         self.test_data = tf.cast(self.Y[-50:], tf.float32)
+
         return self.Y
 
     def setData(self, Y):
@@ -195,7 +244,7 @@ class doe_model:
         Args:
             Y (nd array): the data set to use.
         """
-        self.Y = Y
+        self.Y = np.array(Y)
         self.train_data = tf.cast(self.Y[:-50], tf.float32)
         self.test_data = tf.cast(self.Y[-50:], tf.float32)
 
@@ -210,12 +259,15 @@ class doe_model:
             self.autoencoder = Autoencoder(self.latent_dim, self.Y.shape[1])
             self.autoencoder.compile(optimizer="adam", loss=losses.MeanSquaredError())
 
-    def fit(self, epochs=100):
+    def fit(self, epochs=100, **kwargs):
         """Fit the autoencoder model.
 
         Args:
             epochs (int, optional): Number of epochs to train. Defaults to 100.
+            **kwargs (dict, optional): optional arguments for the fit procedure.
         """
+        if self.autoencoder is None:
+            raise AttributeError("Autoencoder model is not compiled yet")
         if self.use_mlflow:
             mlflow.tensorflow.autolog(every_n_iter=1)
         if self.use_VAE:
@@ -225,6 +277,7 @@ class doe_model:
                 batch_size=128,
                 shuffle=True,
                 validation_data=(self.test_data, self.test_data),
+                **kwargs,
             )
         else:
             self.autoencoder.fit(
@@ -234,6 +287,7 @@ class doe_model:
                 batch_size=128,
                 shuffle=True,
                 validation_data=(self.test_data, self.test_data),
+                **kwargs,
             )
         self.fitNN()
         if self.use_mlflow:
@@ -242,7 +296,8 @@ class doe_model:
             mlflow.end_run()
 
     def fitNN(self):
-        """Fit the neirest neighbour tree."""
+        """Fit the neirest neighbour tree to find similar functions."""
+        self.fitted = True
         self.encoded_Y = self.encode(self.Y)
         self.nn = NearestNeighbors(n_neighbors=1, algorithm="ball_tree").fit(
             self.encoded_Y
@@ -257,30 +312,39 @@ class doe_model:
         Returns:
             tuple: random function string, distance
         """
+        if self.fitted == False:
+            self.fitNN()
         distances, indices = self.nn.kneighbors(features)
         return self.functions[indices[0]][0], distances[0]
 
-    def save(self, dir="models"):
-        """Save the model, sample and data set
+    def save(self, model_dir="model", data_dir="data"):
+        """Save the model and random functions used for training
 
         Args:
-            dir (str, optional): Directory to store the data. Defaults to "models".
+            model_dir (str, optional): Directory to store the model. Defaults to "model".
+            data_dir (str, optional): Directory to store the random functions. Defaults to "data".
+        """
+        self.saveModel(model_dir=model_dir)
+        self.saveData(data_dir=data_dir)
+        return True
+
+    def saveModel(self, model_dir):
+        """Save the model
+
+        Args:
+            model_dir (str, optional): Directory to store the model. Defaults to "model".
         """
         self.autoencoder.save(
-            f"{dir}/model_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}"
+            f"{model_dir}/model_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}"
         )
-        np.save(
-            f"{dir}/sample_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}.npy",
-            self.sample,
-        )
-        np.save(
-            f"{dir}/data_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}.npy",
-            self.Y,
-        )
-        np.save(
-            f"{dir}/functions_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}.npy",
-            self.functions,
-        )
+
+    def saveData(self, data_dir="data"):
+        """Save the random functions used for training
+
+        Args:
+            data_dir (str, optional): Directory to store the random functions. Defaults to "data".
+        """
+        np.save(f"{data_dir}/functions_d{self.dim}-n{self.n}.npy", self.functions)
 
     def encode(self, X):
         """Encode a Design of Experiments.
@@ -315,19 +379,7 @@ class doe_model:
                 )
                 encoded = self.encode([array_x])
                 encodings.append(encoded[0])
-                class_label = 0
-                if f in [1, 2, 3, 4, 5]:
-                    class_label = 1  # "separable"
-                elif f in [6, 7, 8, 9]:
-                    class_label = 2  # "low cond."
-                elif f in [10, 11, 12, 13, 14]:
-                    class_label = 3  # "high cond."
-                elif f in [15, 16, 17, 18, 19]:
-                    class_label = 4  # "multi modal gl."
-                elif f in [20, 21, 22, 23, 24]:
-                    class_label = 5  # "multi modal"
-
-                fuction_groups.append(class_label)
+                fuction_groups.append(f)
 
         X = np.array(encodings)
         y = np.array(fuction_groups).flatten()
@@ -349,7 +401,7 @@ class doe_model:
             mlflow.log_artifact("latent_space.png", "img")
         else:
             plt.savefig(
-                f"../mds/plot_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}.png"
+                f"latent_space_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}.png"
             )
 
     def visualizeTestData(self, n=5):
@@ -417,18 +469,18 @@ class doe_model:
 
 if __name__ == "__main__":
     import os
+
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
     obj = doe_model(
-                2,
-                8,
-                n= 50000,
-                latent_dim=16,
-                kl_weight=0.001,
-                use_mlflow=False,
-                model_type="VAE"
-            )
+        2,
+        8,
+        n=50000,
+        latent_dim=16,
+        kl_weight=0.001,
+        use_mlflow=False,
+        model_type="VAE",
+    )
     obj.load_from_huggingface()
-    #test the model
+    # test the model
     obj.plot_label_clusters_bbob()
-    

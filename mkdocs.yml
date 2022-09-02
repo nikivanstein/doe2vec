@@ -1,0 +1,60 @@
+site_name: DoE2Vec
+
+
+# Repository
+repo_name: doe2vec
+repo_url: https://github.com/Basvanstein/doe2vec
+edit_uri: ""
+# Copyright
+copyright: Bas van Stein
+
+docs_dir: "docs/sources"
+
+plugins:
+  - search
+
+theme:
+  name: 'material'
+  custom_dir: 'docs'
+  palette: 
+    - scheme: default
+      primary: 'teal'
+      accent: green
+      toggle:
+        icon: material/toggle-switch 
+        name: Switch to dark mode
+    - scheme: slate 
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to light mode
+  
+  
+  logo: 'logo.png'
+  favicon: 'favicon.png'
+  features:
+    - content.tabs.link
+    - content.code.annotate
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - instant
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - md_in_html
+  - pymdownx.tabbed:
+      alternate_style: true 
+  - attr_list
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+nav:
+  - Home: 
+    - DoE2Vec: index.md
+    - Installation: installation.md
+    - How to contribute: contributing.md
+  - Class reference: doe2vec/doe_model.md
+  - License: license.md
+extra:
+  version:
+    provider: mike
