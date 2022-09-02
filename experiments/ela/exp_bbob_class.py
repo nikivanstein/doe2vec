@@ -60,12 +60,12 @@ def plot_confusion_matrix(y_test, y_scores, classNames, title="confusion_matrix"
 f1s = []
 f1s_elas = []
 calc_ela = False
-all_dims = [40]
-latent_dim = 24
+all_dims = [2,5,10,20]
+latent_dim = 32
 for dim in all_dims:
 
     obj = doe_model(
-        dim, 8, n=100000, latent_dim=latent_dim, use_mlflow=False, model_type="VAE", kl_weight=0.001
+        dim, 8, n=250000, latent_dim=latent_dim, use_mlflow=False, model_type="VAE", kl_weight=0.001
     )
     
     if not obj.loadModel("../../models/"):
@@ -158,7 +158,7 @@ for dim in all_dims:
     #write DOE data for ELA to excel
     print("old",X.shape) 
     fuction_nrs = []
-    test_size = 20*25
+    test_size = 20*24
     if calc_ela:
         input_names = []
         input_names_2 = []
@@ -254,7 +254,7 @@ for dim in all_dims:
 
     #ELA only
 
-    if False:
+    if True:
         rf = RandomForestClassifier(n_estimators=100)
         rf.fit(X_ela_train, y_1[:-test_size])
         resRf = rf.predict(X_ela_test)
@@ -284,6 +284,10 @@ for d in all_dims:
     print(d, f1s[i])
     print(d, f1s[i+1])
     print(d, f1s[i+2])
+    print("ELA only")
+    print(d, f1s[i+3])
+    print(d, f1s[i+4])
+    print(d, f1s[i+5])
     i+=1
 
 
