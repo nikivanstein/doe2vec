@@ -12,10 +12,10 @@ kl_weight = 0.001
 n = 250000
 seed = 0
 dir = "../models"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 tf.config.experimental.enable_tensor_float_32_execution(False)
-for d in [2]:
+for d in [5,10,20]:
     #push data
     functions = np.load(
         f"{dir}/functions_d{d}-n{n}.npy"
@@ -28,7 +28,7 @@ for d in [2]:
         f"{n}-randomfunctions-{d}d"
     )
     for m in [8]:
-        for latent_dim in [24]:
+        for latent_dim in [24,32]:
             obj = doe_model(
                 d,
                 m,
@@ -38,10 +38,7 @@ for d in [2]:
                 use_mlflow=False,
             )
             if not obj.loadModel("../models/"):
-                obj.generateData()
-                obj.compile()
-                obj.fit(100)
-                obj.save("../models/")
+                exit()
             push_to_hub_keras(
                obj.autoencoder,
                f"doe2vec-d{d}-m{m}-ls{latent_dim}-{model_type}-kl{kl_weight}",
@@ -115,7 +112,7 @@ The model is trained using 250.000 randomly generated functions (see the dataset
 
 """
             text_file = open("README.md", "wt")
-            n = text_file.write(readme)
+            text_file.write(readme)
             text_file.close()
             upload_file(
                 path_or_fileobj="README.md", 

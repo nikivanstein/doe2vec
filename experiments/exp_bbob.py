@@ -23,7 +23,7 @@ def createSurfacePlot(bbob_fun, gen_fun, name="bbobx", title="f_x"):
 
     ax = fig.add_subplot(1, 2, 1, projection="3d")
     # Plot the surface.
-    surf = ax.plot_surface(X, Y, z1, cmap=cm.coolwarm, linewidth=1, antialiased=True)
+    surf = ax.plot_surface(X, Y, z1, cmap=cm.jet, linewidth=1, antialiased=True)
     ax.xaxis.set_ticklabels([])
     ax.yaxis.set_ticklabels([])
     ax.zaxis.set_ticklabels([])
@@ -47,7 +47,7 @@ def createSurfacePlot(bbob_fun, gen_fun, name="bbobx", title="f_x"):
     z2 = np.array(z2).reshape(100, 100)
     # second
     ax = fig.add_subplot(1, 2, 2, projection="3d")
-    surf = ax.plot_surface(X2, Y2, z2, cmap=cm.coolwarm, linewidth=1, antialiased=True)
+    surf = ax.plot_surface(X2, Y2, z2, cmap=cm.terrain, linewidth=1, antialiased=True)
 
     ax.xaxis.set_ticklabels([])
     ax.yaxis.set_ticklabels([])
@@ -67,24 +67,27 @@ def createSurfacePlot(bbob_fun, gen_fun, name="bbobx", title="f_x"):
 
 
 obj = doe_model(
-    2, 8, n=1000000, latent_dim=16, model_type="VAE", kl_weight=0.001, use_mlflow=False
+    2, 8, n=250000, latent_dim=24, model_type="VAE", kl_weight=0.001, use_mlflow=False
 )
 if not obj.loadModel("../models"):
     obj.generateData()
     obj.compile()
     obj.fit(100)
     obj.save()
+if not obj.loadData("../models"):
+    obj.generateData()
+obj.fitNN()
 sample = obj.sample * 10 - 5
 
 for f in range(1, 25):
-    for i in range(5):
-        fun, opt = bbob.instantiate(f, i)
-        name = f"plots_VAE/bbob-f-{f}-i-{i}"
-        bbob_y = np.asarray(list(map(fun, sample)))
-        array_y = (bbob_y.flatten() - np.min(bbob_y)) / (
-            np.max(bbob_y) - np.min(bbob_y)
-        )
-        encoded = obj.encode([array_y])
-        gen_fun, dist = obj.getNeighbourFunction(encoded)
-        print(f, i, dist)
-        createSurfacePlot(fun, gen_fun, name, "$f_{" + str(f) + "}$ instance " + str(i))
+    i = 0
+    fun, opt = bbob.instantiate(f, i)
+    name = f"plots_VAE/bbob-f-{f}-i-{i}"
+    bbob_y = np.asarray(list(map(fun, sample)))
+    array_y = (bbob_y.flatten() - np.min(bbob_y)) / (
+        np.max(bbob_y) - np.min(bbob_y)
+    )
+    encoded = obj.encode([array_y])
+    gen_fun, dist = obj.getNeighbourFunction(encoded)
+    print(f, i, dist)
+    createSurfacePlot(fun, gen_fun, name, "$f_{" + str(f) + "}$ instance " + str(i))

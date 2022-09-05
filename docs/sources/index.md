@@ -1,4 +1,4 @@
-<h1><img src="docs/logo.png" width="128" style="float:left;">DoE2Vec</h1>
+<h1><img src="logo.png" width="128" style="float:left;">DoE2Vec</h1>
 
 
 DoE2Vec is a self-supervised approach to learn exploratory landscape analysis features from design of experiments.
