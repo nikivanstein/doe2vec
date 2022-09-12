@@ -10,15 +10,17 @@ from matplotlib import cm
 
 def plotReconstruction(sample, originals, decoded_does):
     n = len(decoded_does)
-    fig = plt.figure(figsize=(6*4, 8*4))
+    fig = plt.figure(figsize=(8*4, 6*4))
     for i in range(24):
         # display original
-        pos = 1 + (i%8 * 6)
-        if (i >= 16):
+        pos = 1 + (i%6 * 8)
+        if (i >= 18):
+            pos += 6
+        elif (i >= 12):
             pos += 4
-        elif (i >= 8):
+        elif (i >= 6):
             pos += 2
-        ax = fig.add_subplot(8, 6, pos, projection="3d")
+        ax = fig.add_subplot(6, 8, pos, projection="3d")
         ax.plot_trisurf(
             sample[:, 0],
             sample[:, 1],
@@ -36,15 +38,17 @@ def plotReconstruction(sample, originals, decoded_does):
             line.set_visible(False)
         for line in ax.zaxis.get_ticklines():
             line.set_visible(False)
-        plt.title(f"BBOB $f_{{{i+1}}}$")
+        plt.title(f"BBOB $f_{{{i+1}}}$", fontdict={'fontsize':20})
 
-        pos = 2 + (i%8 * 6)
-        if (i >= 16):
+        pos = 2 + (i%6 * 8)
+        if (i >= 18):
+            pos += 6
+        elif (i >= 12):
             pos += 4
-        elif (i >= 8):
+        elif (i >= 6):
             pos += 2
         # display reconstruction
-        ax = fig.add_subplot(8, 6, pos, projection="3d")
+        ax = fig.add_subplot(6, 8, pos, projection="3d")
         ax.plot_trisurf(
             sample[:, 0],
             sample[:, 1],
@@ -62,7 +66,7 @@ def plotReconstruction(sample, originals, decoded_does):
             line.set_visible(False)
         for line in ax.zaxis.get_ticklines():
             line.set_visible(False)
-        plt.title(f"Reconstructed $f_{{{i+1}}}$")
+        plt.title(f"Reconstructed $f_{{{i+1}}}$", fontdict={'fontsize':20})
     #plt.tight_layout()
     plt.savefig("reconstructions.png", bbox_inches='tight')
 

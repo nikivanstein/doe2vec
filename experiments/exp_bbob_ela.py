@@ -47,7 +47,7 @@ def plot_confusion_matrix(y_test, y_scores, classNames, title="confusion_matrix"
     df.figure.savefig(title)
 
 
-ela = pd.read_excel('ela/CEOELA_results/d2/featELA_d2_original.xlsx', index_col=0)
+ela = pd.read_excel('ela/CEOELA_results/d5/featELA_d5_original.xlsx', index_col=0)
 print(ela.columns)
 print(ela.Response1.values)
 ela = ela.apply(lambda x: (x - x.min()) / (x.max() - x.min()), axis=1)
@@ -111,8 +111,8 @@ mds = manifold.MDS(
 embedding = mds.fit_transform(X).T
 # display a 2D plot of the bbob functions in the latent space
 
-plt.figure(figsize=(12, 10))
-plt.scatter(embedding[0], embedding[1], c=y, cmap=cm.jet)
+plt.figure(figsize=(8, 6))
+plt.scatter(embedding[0], embedding[1], c=y, cmap=cm.jet, s=2)
 plt.colorbar()
 plt.xlabel("")
 plt.ylabel("")

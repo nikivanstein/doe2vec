@@ -27,7 +27,7 @@ def createSurfacePlot(bbob_fun, gen_fun, name="bbobx", title="f_x"):
     ax.xaxis.set_ticklabels([])
     ax.yaxis.set_ticklabels([])
     ax.zaxis.set_ticklabels([])
-    plt.title(title)
+    plt.title(title, fontdict={'fontsize':20})
 
     for line in ax.xaxis.get_ticklines():
         line.set_visible(False)
@@ -59,7 +59,7 @@ def createSurfacePlot(bbob_fun, gen_fun, name="bbobx", title="f_x"):
         line.set_visible(False)
     for line in ax.zaxis.get_ticklines():
         line.set_visible(False)
-    plt.title(f"Nearest random function")
+    plt.title(f"Nearest random function", fontdict={'fontsize':20})
 
     # Add a color bar which maps values to colors.
     # fig.colorbar(surf, shrink=0.5, aspect=5)
@@ -80,7 +80,7 @@ obj.fitNN()
 sample = obj.sample * 10 - 5
 
 for f in range(1, 25):
-    i = 0
+    i = 1
     fun, opt = bbob.instantiate(f, i)
     name = f"plots_VAE/bbob-f-{f}-i-{i}"
     bbob_y = np.asarray(list(map(fun, sample)))
