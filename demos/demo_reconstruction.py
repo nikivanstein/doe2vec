@@ -1,6 +1,6 @@
 """Reconstruction demo
 @author: Bas van Stein
-For this demo you need gradio `pip install gradio`
+For this demo you need gradio `pip install gradio plotly`
 
 Shows the reconstruction of 2d landscapes by sliding the latent space variables.
 """
@@ -10,13 +10,14 @@ import os
 import numpy as np
 import bbobbenchmarks as bbob
 from doe2vec import doe_model
+import gradio as gr
 
-#remove line if you only use a device with 1 GPU
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+#remove line if you want to use a GPU
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 import matplotlib.pyplot as plt
 from matplotlib import cm
-
+import plotly.graph_objects as go
 
 obj = doe_model(
     2, 8, n=250000, latent_dim=8, model_type="VAE", kl_weight=0.001, use_mlflow=False
@@ -27,7 +28,36 @@ if not obj.loadModel("../models"):
     obj.fit(100)
     obj.save()
 
+
+def plotReconstructionInteractive(sample, decoded):
+    layout = go.Layout(
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        scene={"aspectmode":"cube"}
+    )
+    fig = go.Figure(data=[
+        go.Mesh3d(
+            x=sample[:,0],
+            y=sample[:,1],
+            z=decoded[0],
+            opacity=0.8,
+            intensity=decoded[0],
+            showlegend=False,
+            showscale=False,
+            colorscale="Viridis",
+        ),], layout=layout)
+    fig.update_layout(
+        width=600,
+        height=600, 
+        margin=dict(l=10, r=10, b=10, t=10))
+    return fig
+
+
 def plotReconstruction(sample, decoded):
+    plt.rcParams.update({
+        "figure.facecolor":  (0.0, 0.0, 0.0, 0.0), 
+        "axes.facecolor":    (0.0, 0.0, 0.0, 0.0),  
+    })
     fig = plt.figure(figsize=(8, 8))
     ax = fig.add_subplot(1, 1, 1, projection="3d")
     ax.plot_trisurf(
@@ -46,27 +76,19 @@ def plotReconstruction(sample, decoded):
         line.set_visible(False)
     for line in ax.zaxis.get_ticklines():
         line.set_visible(False)
-    plt.title("Reconstruction of the latent space", fontdict={'fontsize':14})
-    plt.savefig("reco.png", bbox_inches='tight', transparent=True)
-    plt.close()
+    return fig
+
 
 def predict_ls(x1,x2,x3,x4,x5,x6,x7,x8):
     latentspace = np.atleast_2d([x1,x2,x3,x4,x5,x6,x7,x8])
     doe = obj.autoencoder.decoder(latentspace).numpy()
-    plotReconstruction(obj.sample, doe)
-    return 'reco.png'
+    return plotReconstructionInteractive(obj.sample, doe)
 
-
-import gradio as gr
-
-intro = gr.Markdown(
-    """
-    # DoE2Vec
-    Change the sliders on the left to generate different landscapes with the VAE decoder.
-    """)
 
 gr.Interface(
     predict_ls,
+    title="DoE2Vec - reconstruction demo",
+    description="Change the sliders on the left to generate different landscapes with the decoder part of the VAE.",
     inputs=[
         gr.Slider(-2.0, 2.0, label='x1', step=0.01, value=0.0),
         gr.Slider(-2.0, 2.0, label='x2', step=0.01, value=0.0),
@@ -77,7 +99,7 @@ gr.Interface(
         gr.Slider(-2.0, 2.0, label='x7', step=0.01, value=0.0),
         gr.Slider(-2.0, 2.0, label='x8', step=0.01, value=0.0),
     ],
-    outputs=[intro,"image"],
+    outputs="plot",
     live=True,
     allow_flagging='never',
 ).launch()
