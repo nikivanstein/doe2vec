@@ -50,7 +50,7 @@ def plotReconstruction(sample, decoded):
     plt.savefig("reco.png", bbox_inches='tight', transparent=True)
     plt.close()
 
-def predict(x1,x2,x3,x4,x5,x6,x7,x8):
+def predict_ls(x1,x2,x3,x4,x5,x6,x7,x8):
     latentspace = np.atleast_2d([x1,x2,x3,x4,x5,x6,x7,x8])
     doe = obj.autoencoder.decoder(latentspace).numpy()
     plotReconstruction(obj.sample, doe)
@@ -59,8 +59,14 @@ def predict(x1,x2,x3,x4,x5,x6,x7,x8):
 
 import gradio as gr
 
+intro = gr.Markdown(
+    """
+    # DoE2Vec
+    Change the sliders on the left to generate different landscapes with the VAE decoder.
+    """)
+
 gr.Interface(
-    predict,
+    predict_ls,
     inputs=[
         gr.Slider(-2.0, 2.0, label='x1', step=0.01, value=0.0),
         gr.Slider(-2.0, 2.0, label='x2', step=0.01, value=0.0),
@@ -71,10 +77,7 @@ gr.Interface(
         gr.Slider(-2.0, 2.0, label='x7', step=0.01, value=0.0),
         gr.Slider(-2.0, 2.0, label='x8', step=0.01, value=0.0),
     ],
-    outputs="image",
+    outputs=[intro,"image"],
     live=True,
-    allow_flagging=False,
+    allow_flagging='never',
 ).launch()
-
-
-
