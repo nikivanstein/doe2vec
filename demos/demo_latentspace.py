@@ -52,7 +52,7 @@ def plotReconstructionInteractive(sample, decoded, ori, encoded):
     
     fig.add_trace(
         go.Scatter3d(x=sample[:, 0], y=sample[:, 1], z=ori, mode="markers", marker=dict(
-                size=8,
+                size=3,
                 color=ori,  # set color to an array/list of desired values
                 colorscale='Viridis',   # choose a colorscale
                 opacity=0.8
@@ -60,7 +60,7 @@ def plotReconstructionInteractive(sample, decoded, ori, encoded):
             row=1, col=2)
     fig.add_trace(
         go.Scatter3d(x=sample[:, 0], y=sample[:, 1], z=decoded[0], mode="markers", marker=dict(
-                size=8,
+                size=3,
                 color=decoded[0],  # set color to an array/list of desired values
                 colorscale='Viridis',   # choose a colorscale
                 opacity=0.8
@@ -71,7 +71,7 @@ def plotReconstructionInteractive(sample, decoded, ori, encoded):
         var = calcVariance(encoded[0], i)
         fig.add_trace(
             go.Scatter3d(x=sample[:, 0], y=sample[:, 1], z=decoded[0], mode="markers", marker=dict(
-                size=8,
+                size=3,
                 color=var,  # set color to an array/list of desired values
                 colorscale='Viridis',   # choose a colorscale
                 opacity=0.8
