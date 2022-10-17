@@ -5,7 +5,7 @@ from tensorflow.keras import layers, losses
 from tensorflow.keras.models import Model
 import numpy as np
 from keras.layers import Dense, Input, Concatenate, Lambda
-
+from keras.utils.vis_utils import plot_model
 
 class Autoencoder(Model):
     def __init__(self, latent_dim, sample_size):
@@ -37,6 +37,7 @@ class CustomAutoencoder(Model):
         super(CustomAutoencoder, self).__init__()
         self.latent_dim = latent_dim
         self.DOE = DOE
+        self.sample_size = sample_size
         self.encoder = self._encoder()
         self.decoder = tf.keras.Sequential(
             [
@@ -47,32 +48,33 @@ class CustomAutoencoder(Model):
         )
 
     def _encoder(self):
-        '''tf.keras.Sequential(
-            [
-                layers.Dense(sample_size / 2, activation="relu"),
-                layers.Dense(sample_size / 4, activation="relu"),
-                layers.Dense(latent_dim, activation="relu"),
-            ]
-        )'''
+        '''Create a Dense network with shape information from the DOE'''
         inputTensor = Input((self.sample_size,))
         groups = []
         sorted_DOE = np.argsort(self.DOE, axis=0)
-    
+        print("sorted DOE", sorted_DOE)
         
         for i in range(1,len(self.DOE)-1):
             indexes_to_use = []
-            for d in self.DOE.shape[1]:
+            for d in range(self.DOE.shape[1]):
                 #for each dimension
-                indexes_to_use.append(sorted_DOE[i-1:i+1, d])
-                
-            group = Lambda(lambda x: x[:,indexes_to_use], output_shape=((len(indexes_to_use),)))(inputTensor)
+                indexes_to_use.append(sorted_DOE[i-1:i+2, d])
+            indexes_to_use = np.unique(np.array(indexes_to_use).flatten())
+            print("indexes to use for ",i, self.DOE[i], indexes_to_use)
+            tf_indexes = tf.convert_to_tensor(list(indexes_to_use), tf.int32)
+            group = Lambda(lambda x: x[:,tf_indexes], output_shape=((len(indexes_to_use),)))(inputTensor)
             group = Dense(1, activation="relu")(group)
             groups.append(group)
+        x = Concatenate()(groups)
         x = Dense(self.sample_size / 4, activation="relu")(x)
         x = Dense(self.latent_dim, activation="relu")(x)
         encoder = tf.keras.Model(inputTensor, x, name="encoder")
         encoder.summary()
         return encoder
+
+    def plot(self):
+        plot_model(self.encoder, to_file='encoder.png', show_shapes=True, show_layer_names=True)
+        plot_model(self.decoder, to_file='decoder.png', show_shapes=True, show_layer_names=True)
 
     def call(self, x):
         encoded = self.encoder(x)
@@ -180,3 +182,16 @@ class VAE(Model):
             "reconstruction_loss": self.reconstruction_loss_tracker.result(),
             "kl_loss": self.kl_loss_tracker.result(),
         }
+
+
+if __name__ == "__main__":
+    import os
+    from scipy.stats import qmc
+    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+    sampler = qmc.Sobol(d=2, scramble=False, seed=0)
+    sample = sampler.random_base2(m=2) #should create 4 samples
+    print(sample)
+    model = CustomAutoencoder(2,len(sample),sample)
+    model.compile(optimizer="adam")
+    model.summary()
+    model.plot()
