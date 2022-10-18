@@ -70,19 +70,22 @@ class CustomAutoencoder(Model):
 
     def _encoder(self):
         '''Create a Dense network with shape information from the DOE'''
+        import matplotlib.pyplot as plt
         #we use knowledge of the space filling design to determine the distance threshold
         inputTensor = Input((self.sample_size,))
         sorted_DOE = np.argsort(self.DOE, axis=0)
         print("sorted DOE", sorted_DOE)
         connections = np.zeros((self.sample_size,self.sample_size))
         pair_distances = pairwise_distances(self.DOE, metric='cityblock')
-        print("pair_distances", pair_distances)
+        print("pair_distances", pair_distances[0])
         for i in range(0,len(self.DOE)):
-            indexes_to_use = np.argsort(pair_distances[i,:])[:self.dim * 2]
+            indexes_to_use = np.argsort(pair_distances[i,:])[:self.dim * 2 + 1]
+            plt.plot(self.DOE[indexes_to_use,0],self.DOE[indexes_to_use,1], '-o', alpha=0.4)
             connections[indexes_to_use, i] = 1
-            connections[i, i] = 1
         tf_connections = tf.convert_to_tensor(connections, dtype=tf.float32)
         print("connections",connections)
+        plt.savefig("connections.png")
+
         #x = Concatenate()(groups)
         x = CustomConnected(self.sample_size, tf_connections, activation="relu")(inputTensor)
         x = Dense(self.sample_size / 2, activation="relu")(x)
@@ -209,10 +212,9 @@ if __name__ == "__main__":
     from scipy.stats import qmc
     os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
     sampler = qmc.Sobol(d=2, scramble=False, seed=0)
-    sample = sampler.random_base2(m=3) #should create 4 samples
+    sample = sampler.random_base2(m=10) #should create 4 samples
     print(sample)
     model = CustomAutoencoder(2,len(sample),sample)
     model.compile(optimizer="adam")
     model.build(input_shape=(2,sample.shape[0]))
     model.summary()
-    model.plot()
