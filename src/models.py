@@ -6,6 +6,8 @@ from tensorflow.keras.models import Model
 import numpy as np
 from keras.layers import Dense, Input, Concatenate, Lambda
 from keras.utils.vis_utils import plot_model
+from sklearn.metrics import pairwise_distances
+import keras.backend as K
 
 class Autoencoder(Model):
     def __init__(self, latent_dim, sample_size):
@@ -31,12 +33,30 @@ class Autoencoder(Model):
         decoded = self.decoder(encoded)
         return decoded
 
+class CustomConnected(Dense):
+
+    def __init__(self,units,connections,**kwargs):
+
+        #this is matrix A
+        self.connections = connections                        
+
+        #initalize the original Dense with all the usual arguments   
+        super(CustomConnected,self).__init__(units,**kwargs)  
+
+    def call(self, inputs):
+        output = K.dot(inputs, self.kernel * self.connections)
+        if self.use_bias:
+            output = K.bias_add(output, self.bias)
+        if self.activation is not None:
+            output = self.activation(output)
+        return output
 
 class CustomAutoencoder(Model):
     def __init__(self, latent_dim, sample_size, DOE):
         super(CustomAutoencoder, self).__init__()
         self.latent_dim = latent_dim
         self.DOE = DOE
+        self.dim = self.DOE.shape[1]
         self.sample_size = sample_size
         self.encoder = self._encoder()
         self.decoder = tf.keras.Sequential(
@@ -47,25 +67,25 @@ class CustomAutoencoder(Model):
             ]
         )
 
+
     def _encoder(self):
         '''Create a Dense network with shape information from the DOE'''
+        #we use knowledge of the space filling design to determine the distance threshold
         inputTensor = Input((self.sample_size,))
-        groups = []
         sorted_DOE = np.argsort(self.DOE, axis=0)
         print("sorted DOE", sorted_DOE)
-        
-        for i in range(1,len(self.DOE)-1):
-            indexes_to_use = []
-            for d in range(self.DOE.shape[1]):
-                #for each dimension
-                indexes_to_use.append(sorted_DOE[i-1:i+2, d])
-            indexes_to_use = np.unique(np.array(indexes_to_use).flatten())
-            print("indexes to use for ",i, self.DOE[i], indexes_to_use)
-            tf_indexes = tf.convert_to_tensor(list(indexes_to_use), tf.int32)
-            group = Lambda(lambda x: x[:,tf_indexes], output_shape=((len(indexes_to_use),)))(inputTensor)
-            group = Dense(1, activation="relu")(group)
-            groups.append(group)
-        x = Concatenate()(groups)
+        connections = np.zeros((self.sample_size,self.sample_size))
+        pair_distances = pairwise_distances(self.DOE, metric='cityblock')
+        print("pair_distances", pair_distances)
+        for i in range(0,len(self.DOE)):
+            indexes_to_use = np.argsort(pair_distances[i,:])[:self.dim * 2]
+            connections[indexes_to_use, i] = 1
+            connections[i, i] = 1
+        tf_connections = tf.convert_to_tensor(connections, dtype=tf.float32)
+        print("connections",connections)
+        #x = Concatenate()(groups)
+        x = CustomConnected(self.sample_size, tf_connections, activation="relu")(inputTensor)
+        x = Dense(self.sample_size / 2, activation="relu")(x)
         x = Dense(self.sample_size / 4, activation="relu")(x)
         x = Dense(self.latent_dim, activation="relu")(x)
         encoder = tf.keras.Model(inputTensor, x, name="encoder")
@@ -189,9 +209,10 @@ if __name__ == "__main__":
     from scipy.stats import qmc
     os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
     sampler = qmc.Sobol(d=2, scramble=False, seed=0)
-    sample = sampler.random_base2(m=2) #should create 4 samples
+    sample = sampler.random_base2(m=3) #should create 4 samples
     print(sample)
     model = CustomAutoencoder(2,len(sample),sample)
     model.compile(optimizer="adam")
+    model.build(input_shape=(2,sample.shape[0]))
     model.summary()
     model.plot()
