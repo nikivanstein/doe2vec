@@ -157,15 +157,33 @@ if __name__ == "__main__":
             #create a dense network for each classification problem
             
                     
-            X = np.array(encodings)
+            X = np.array(X)
+            
             y_1 = np.array(multim_label).flatten()
             y_2 = np.array(global_label).flatten()
             y_3 = np.array(funnel_label).flatten()
+            #use LabelEncoder
 
             test_size = 20*25
             
             X_train = X[:-test_size]
             X_test = X[-test_size:]
+
+
+            cf1 = StructuralInformedDense([128,64],y_1.shape[1],X.shape[1],sample)
+            cf1.compile(loss='binary_crossentropy', optimizer='adam')
+
+            # make a prediction on the test set
+            yhat = cf1.predict(X_test)
+            # round probabilities to class labels
+            yhat = yhat.round()
+            # calculate accuracy
+            acc = accuracy_score(y_test, yhat)
+
+            cf2 = StructuralInformedDense([128,64],y_2.shape[1],X.shape[1],sample)
+
+
+            cf3 = StructuralInformedDense([128,64],y_3.shape[1],X.shape[1],sample)
 
             rf = RandomForestClassifier(n_estimators=100)
             rf.fit(X_train, y_1[:-test_size])
