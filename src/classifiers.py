@@ -7,7 +7,10 @@ import numpy as np
 from keras.layers import Dense, Input, Concatenate, Lambda
 from keras.utils.vis_utils import plot_model
 from sklearn.metrics import pairwise_distances
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 import keras.backend as K
+from sklearn.metrics import f1_score
+import json
 
 
 class CustomConnected(Dense):
@@ -159,54 +162,43 @@ if __name__ == "__main__":
                     
             X = np.array(X)
             
-            y_1 = np.array(multim_label).flatten()
-            y_2 = np.array(global_label).flatten()
-            y_3 = np.array(funnel_label).flatten()
-            #use LabelEncoder
-
+            y_1 = np.array(multim_label)
+            y_2 = np.array(global_label)
+            y_3 = np.array(funnel_label)
+            #use LabelEncoder or OneHotEncoder
+            enc1 = OneHotEncoder(handle_unknown='ignore')
+            enc2 = OneHotEncoder(handle_unknown='ignore')
+            enc3 = OneHotEncoder(handle_unknown='ignore')
+            y_1 = enc1.fit_transform(y_1)
+            y_2 = enc2.fit_transform(y_2)
+            y_3 = enc3.fit_transform(y_3)
             test_size = 20*25
             
             X_train = X[:-test_size]
             X_test = X[-test_size:]
 
-
-            cf1 = StructuralInformedDense([128,64],y_1.shape[1],X.shape[1],sample)
-            cf1.compile(loss='binary_crossentropy', optimizer='adam')
-
-            # make a prediction on the test set
-            yhat = cf1.predict(X_test)
-            # round probabilities to class labels
-            yhat = yhat.round()
-            # calculate accuracy
-            acc = accuracy_score(y_test, yhat)
-
-            cf2 = StructuralInformedDense([128,64],y_2.shape[1],X.shape[1],sample)
-
-
-            cf3 = StructuralInformedDense([128,64],y_3.shape[1],X.shape[1],sample)
-
-            rf = RandomForestClassifier(n_estimators=100)
-            rf.fit(X_train, y_1[:-test_size])
-
-            resRf = rf.predict(X_test)
-            f1_macro = f1_score(y_1[-test_size:], resRf, average='macro')
-            f1_results[model_type+str(latent_dim)][f"d{dim} multimodal"] = f1_macro
-
-            rf = RandomForestClassifier(n_estimators=100)
-            rf.fit(X_train, y_2[:-test_size])
-            resRf = rf.predict(X_test)
-            f1_macro = f1_score(y_2[-test_size:], resRf, average='macro')
-            f1_results[model_type+str(latent_dim)][f"d{dim} global"] = f1_macro
-
-            rf = RandomForestClassifier(n_estimators=100)
-            rf.fit(X_train, y_3[:-test_size])
-            resRf = rf.predict(X_test)
-            f1_macro = f1_score(y_3[-test_size:], resRf, average='macro')
-            f1_results[model_type+str(latent_dim)][f"d{dim} funnel"] = f1_macro
-
-            print(f1_results)
+            
+            ys = [y_1,y_2,y_3]
+            probs = ["multimodal", "global", "funnel"]
+            for i in [0,1,2]:
+                y = ys[i]
+                prob = probs[i]
+                cf = StructuralInformedDense([128,64],y.shape[1],X.shape[1],sample)
+                cf.compile(loss='binary_crossentropy', optimizer='adam')
+                cf.fit(
+                    X_train, y[:-test_size],
+                    epochs=200,
+                    batch_size=128,
+                    shuffle=True,
+                    validation_data=(X_test, y[-test_size:])
+                )
+                y_pred = cf.predict(X_test)
+                score = f1_score(y[-test_size:], y_pred, average='macro')
+                print(prob, score)
+                f1_results[model_type][f"d{dim} {prob}"] = score
+            
 
 
-    with open('f1_results.json', 'w') as fp:
+    with open('f1_results_class.json', 'w') as fp:
         json.dump(f1_results, fp)
 
