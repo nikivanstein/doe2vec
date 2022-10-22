@@ -11,6 +11,7 @@ from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 import keras.backend as K
 from sklearn.metrics import f1_score
 import json
+from keras.utils import np_utils
 
 
 class CustomConnected(Dense):
@@ -166,22 +167,30 @@ if __name__ == "__main__":
             y_2 = np.array(global_label)
             y_3 = np.array(funnel_label)
             #use LabelEncoder or OneHotEncoder
-            enc1 = OneHotEncoder(handle_unknown='ignore')
-            enc2 = OneHotEncoder(handle_unknown='ignore')
-            enc3 = OneHotEncoder(handle_unknown='ignore')
+            enc1 = LabelEncoder()
+            enc2 = LabelEncoder()
+            enc3 = LabelEncoder()
+
+            
             y_1 = enc1.fit_transform(y_1)
             y_2 = enc2.fit_transform(y_2)
             y_3 = enc3.fit_transform(y_3)
+
+            dummy_y1 = np_utils.to_categorical(y_1)
+            dummy_y2 = np_utils.to_categorical(y_2)
+            dummy_y3 = np_utils.to_categorical(y_3)
             test_size = 20*25
             
             X_train = X[:-test_size]
             X_test = X[-test_size:]
 
             
+            dummy_ys = [dummy_y1,dummy_y2,dummy_y3]
             ys = [y_1,y_2,y_3]
             probs = ["multimodal", "global", "funnel"]
             for i in [0,1,2]:
-                y = ys[i]
+                y = dummy_ys[i]
+                real_y = ys[i]
                 prob = probs[i]
                 cf = StructuralInformedDense([128,64],y.shape[1],X.shape[1],sample)
                 cf.compile(loss='binary_crossentropy', optimizer='adam')
@@ -192,8 +201,10 @@ if __name__ == "__main__":
                     shuffle=True,
                     validation_data=(X_test, y[-test_size:])
                 )
-                y_pred = cf.predict(X_test)
-                score = f1_score(y[-test_size:], y_pred, average='macro')
+                y_dummy_pred = cf.predict(X_test)
+                y_pred = np.argmax(y_dummy_pred, axis=1)
+                print(y_pred)
+                score = f1_score(real_y[-test_size:], y_pred, average='macro')
                 print(prob, score)
                 f1_results[model_type][f"d{dim} {prob}"] = score
             
