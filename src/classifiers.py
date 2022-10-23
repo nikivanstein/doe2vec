@@ -65,7 +65,6 @@ class StructuralInformedDense(Model):
 
         x = Dense(self.num_classes, activation="sigmoid")(x)
         classifier = tf.keras.Model(inputTensor, x, name="StructuralInformedDense")
-        classifier.summary()
         return classifier
 
     def call(self, x):
@@ -196,16 +195,16 @@ if __name__ == "__main__":
                 cf.compile(loss='binary_crossentropy', optimizer='adam')
                 cf.fit(
                     X_train, y[:-test_size],
-                    epochs=200,
-                    batch_size=128,
+                    epochs=50,
+                    batch_size=32,
                     shuffle=True,
-                    validation_data=(X_test, y[-test_size:])
+                    validation_data=(X_test, y[-test_size:]),
+                    verbose=0
                 )
                 y_dummy_pred = cf.predict(X_test)
                 y_pred = np.argmax(y_dummy_pred, axis=1)
-                print(y_pred)
                 score = f1_score(real_y[-test_size:], y_pred, average='macro')
-                print(prob, score)
+                print(dim, prob, score)
                 f1_results[model_type][f"d{dim} {prob}"] = score
             
 
