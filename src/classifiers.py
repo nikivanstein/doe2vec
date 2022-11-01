@@ -51,7 +51,6 @@ class StructuralInformedDense(Model):
         '''Create a Dense network with shape information from the DOE'''
         #we use knowledge of the space filling design to determine the distance threshold
         inputTensor = Input((self.sample_size,))
-        sorted_DOE = np.argsort(self.DOE, axis=0)
         connections = np.zeros((self.sample_size,self.sample_size))
         pair_distances = pairwise_distances(self.DOE, metric='cityblock')
         for i in range(0,len(self.DOE)):
@@ -204,8 +203,32 @@ if __name__ == "__main__":
                 y_dummy_pred = cf.predict(X_test)
                 y_pred = np.argmax(y_dummy_pred, axis=1)
                 score = f1_score(real_y[-test_size:], y_pred, average='macro')
-                print(dim, prob, score)
+                print("new",dim, prob, score)
                 f1_results[model_type][f"d{dim} {prob}"] = score
+
+                ### normal dense network
+                denseModel = tf.keras.Sequential(
+                    [
+                        #layers.Dense(X.shape[1], activation="relu"),
+                        layers.Dense(128, activation="relu"),
+                        layers.Dense(64, activation="relu"),
+                        layers.Dense(y.shape[1], activation="sigmoid"),
+                    ]
+                )
+                denseModel.compile(loss='binary_crossentropy', optimizer='adam')
+                denseModel.fit(
+                    X_train, y[:-test_size],
+                    epochs=50,
+                    batch_size=32,
+                    shuffle=True,
+                    validation_data=(X_test, y[-test_size:]),
+                    verbose=0
+                )
+                y_dummy_pred = denseModel.predict(X_test)
+                y_pred = np.argmax(y_dummy_pred, axis=1)
+                score = f1_score(real_y[-test_size:], y_pred, average='macro')
+                print("dense",dim, prob, score)
+                f1_results["dense"][f"d{dim} {prob}"] = score
             
 
 
