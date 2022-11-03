@@ -4,7 +4,7 @@ import tensorflow as tf
 from tensorflow.keras import layers, losses
 from tensorflow.keras.models import Model
 import numpy as np
-from keras.layers import Dense, Input, Concatenate, Lambda
+from keras.layers import Dense, Input, Concatenate, Lambda, Flatten, Dropout
 from keras.utils.vis_utils import plot_model
 from sklearn.metrics import pairwise_distances
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
@@ -12,6 +12,7 @@ import keras.backend as K
 from sklearn.metrics import f1_score
 import json
 from keras.utils import np_utils
+from convnd import ConvND
 
 
 class CustomConnected(Dense):
@@ -61,9 +62,46 @@ class StructuralInformedDense(Model):
         x = CustomConnected(self.sample_size, tf_connections, activation="relu")(inputTensor)
         for num_nodes in self.layer_sizes:
             x = Dense(num_nodes, activation="relu")(x)
-
+        x = Dropout(0.2)(x)
         x = Dense(self.num_classes, activation="sigmoid")(x)
         classifier = tf.keras.Model(inputTensor, x, name="StructuralInformedDense")
+        return classifier
+
+    def call(self, x):
+        return self.classifier(x)
+
+
+class ConvNDClassifier(Model):
+    def __init__(self, num_classes, samples_per_dim, DOE):
+        """Dense classifier with custom connections based on the DOE between input and first hidden layer.
+        """
+        super(ConvNDClassifier, self).__init__()
+        self.DOE = DOE
+        self.num_classes = num_classes
+        self.dim = self.DOE.shape[1]
+        #print(self.dim)
+        self.sample_size = samples_per_dim
+        self.classifier = self._classifier()
+
+
+    def _classifier(self):
+        '''Create a ND CNN classifier with 1 NDCNN layer and a dense output layer'''
+        inputsize = (self.sample_size,)*self.dim
+        inputsize = (*inputsize, 1)
+        inputTensor = Input(inputsize)
+
+        #input_shape =(4, 28, 28, 28, 1)
+        #>>> x = tf.random.normal(input_shape)
+        #>>> y = tf.keras.layers.Conv3D(
+        #... 2, 3, activation='relu', input_shape=input_shape[1:])(x)
+
+        x = ConvND(self.dim, filters=64, kernel_size=3, activation="relu", padding="same")(inputTensor)
+        #x = ConvND(self.dim, filters=16, kernel_size=3, activation="relu", padding="same")(inputTensor)
+        x = Flatten()(x)
+        #x = Dropout(0.2)(x)
+        x = Dense(self.num_classes, activation="sigmoid")(x)
+        classifier = tf.keras.Model(inputTensor, x, name="NDCNN")
+        #classifier.summary()
         return classifier
 
     def call(self, x):
@@ -87,16 +125,28 @@ if __name__ == "__main__":
     """
     f1_results = {}
     calc_ela = False
-    all_dims = [2,5,10,20,40]
+    all_dims = [2,3,4,5,10]#,10,20,40]
     latent_dim = 24
+    nxs = [100,50,20,10,5]
     m=9 #number of samples
     for model_type in ["SID"]:
         f1_results[model_type] = {}
+        f1_results["dense"] = {}
+        f1_results["NDCNN"] = {}
+        dim_i = 0
         for dim in all_dims:
-            sampler = qmc.Sobol(d=dim, scramble=False, seed=seed)
-            sample = sampler.random_base2(m=m)
-            sample = sample * 10 - 5
+            nx = nxs[dim_i]
+            dim_i += 1
+            linspaces = []
+            for d in range(dim):
+                x = np.linspace(-5, 5, nx)
+                linspaces.append(x)
+            mesh = np.meshgrid(*linspaces)
+            sample = np.reshape(mesh, (dim, -1)).T
+            print("#samples ", len(sample))
+
             X = []
+            mesh_X = []
             multim_label = []
             global_label = []
             funnel_label = []
@@ -108,6 +158,7 @@ if __name__ == "__main__":
                         np.max(bbob_y) - np.min(bbob_y)
                     )
                     X.append(array_x)
+                    mesh_X.append(np.reshape(array_x, (nx,)*dim))
                     if f in [1,2]:
                         multim_label.append("none")
                         global_label.append("none")
@@ -160,7 +211,7 @@ if __name__ == "__main__":
             
                     
             X = np.array(X)
-            
+            mesh_X = np.array(mesh_X)
             y_1 = np.array(multim_label)
             y_2 = np.array(global_label)
             y_3 = np.array(funnel_label)
@@ -182,6 +233,9 @@ if __name__ == "__main__":
             X_train = X[:-test_size]
             X_test = X[-test_size:]
 
+            X_mesh_train = mesh_X[:-test_size]
+            X_mesh_test = mesh_X[-test_size:]
+
             
             dummy_ys = [dummy_y1,dummy_y2,dummy_y3]
             ys = [y_1,y_2,y_3]
@@ -190,6 +244,27 @@ if __name__ == "__main__":
                 y = dummy_ys[i]
                 real_y = ys[i]
                 prob = probs[i]
+
+                
+                ### NDCNN
+                NDCNNmodel = ConvNDClassifier(y.shape[1],nx,sample)
+                NDCNNmodel.compile(loss='binary_crossentropy', optimizer='adam')
+                NDCNNmodel.fit(
+                    X_mesh_train, y[:-test_size],
+                    epochs=50,
+                    batch_size=32,
+                    shuffle=True,
+                    validation_data=(X_mesh_test, y[-test_size:]),
+                    verbose=0
+                )
+                y_dummy_pred = NDCNNmodel.predict(X_mesh_test)
+                y_pred = np.argmax(y_dummy_pred, axis=1)
+                score = f1_score(real_y[-test_size:], y_pred, average='macro')
+                print("NDCNN",dim, prob, score)
+                f1_results["NDCNN"][f"d{dim} {prob}"] = score
+
+
+                #StructuralInformedDense
                 cf = StructuralInformedDense([128,64],y.shape[1],X.shape[1],sample)
                 cf.compile(loss='binary_crossentropy', optimizer='adam')
                 cf.fit(
@@ -229,9 +304,12 @@ if __name__ == "__main__":
                 score = f1_score(real_y[-test_size:], y_pred, average='macro')
                 print("dense",dim, prob, score)
                 f1_results["dense"][f"d{dim} {prob}"] = score
+
+
             
 
 
     with open('f1_results_class.json', 'w') as fp:
         json.dump(f1_results, fp)
+        
 
