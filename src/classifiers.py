@@ -72,6 +72,7 @@ class StructuralInformedDense(Model):
 
 
 class ConvNDClassifier(Model):
+    
     def __init__(self, num_classes, samples_per_dim, DOE):
         """Dense classifier with custom connections based on the DOE between input and first hidden layer.
         """

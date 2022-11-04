@@ -7,13 +7,13 @@ from keras import initializers
 from keras import regularizers
 from keras.dtensor import utils
 from keras.layers.convolutional.base_conv import Conv
-
+from base_nconf import NConv
 # isort: off
 from tensorflow.python.util.tf_export import keras_export
 
 
 @keras_export("keras.layers.ConvND", "keras.layers.ConvolutionND")
-class ConvND(Conv):
+class ConvND(NConv):
     """ND convolution layer (e.g. very weird space convolutions :)).
 
     This layer creates a convolution kernel that is convolved
