@@ -126,9 +126,9 @@ if __name__ == "__main__":
     """
     f1_results = {}
     calc_ela = False
-    all_dims = [2,3,4,5,10]#,10,20,40]
+    all_dims = [2,3,5,10,20]#,10,20,40]
     latent_dim = 24
-    nxs = [100,50,20,10,5]
+    nxs = [30,20]
     m=9 #number of samples
     for model_type in ["SID"]:
         f1_results[model_type] = {}
@@ -136,16 +136,21 @@ if __name__ == "__main__":
         f1_results["NDCNN"] = {}
         dim_i = 0
         for dim in all_dims:
-            nx = nxs[dim_i]
-            dim_i += 1
-            linspaces = []
-            for d in range(dim):
-                x = np.linspace(-5, 5, nx)
-                linspaces.append(x)
-            mesh = np.meshgrid(*linspaces)
-            sample = np.reshape(mesh, (dim, -1)).T
-            print("#samples ", len(sample))
-
+            if (dim < 4):
+                nx = nxs[dim_i]
+                dim_i += 1
+                linspaces = []
+                for d in range(dim):
+                    x = np.linspace(-5, 5, nx)
+                    linspaces.append(x)
+                mesh = np.meshgrid(*linspaces)
+                sample = np.reshape(mesh, (dim, -1)).T
+                print("#samples ", len(sample))
+            else:
+                sampler = qmc.Sobol(d=dim, scramble=False, seed=42)
+                sample = sampler.random_base2(m=m)
+                sample = sample * 10 - 5
+                print("#samples ", len(sample))
             X = []
             mesh_X = []
             multim_label = []
@@ -159,7 +164,8 @@ if __name__ == "__main__":
                         np.max(bbob_y) - np.min(bbob_y)
                     )
                     X.append(array_x)
-                    mesh_X.append(np.reshape(array_x, (nx,)*dim))
+                    if (dim < 4):
+                        mesh_X.append(np.reshape(array_x, (nx,)*dim))
                     if f in [1,2]:
                         multim_label.append("none")
                         global_label.append("none")
@@ -212,7 +218,8 @@ if __name__ == "__main__":
             
                     
             X = np.array(X)
-            mesh_X = np.array(mesh_X)
+            if (dim < 4):
+                mesh_X = np.array(mesh_X)
             y_1 = np.array(multim_label)
             y_2 = np.array(global_label)
             y_3 = np.array(funnel_label)
@@ -234,8 +241,9 @@ if __name__ == "__main__":
             X_train = X[:-test_size]
             X_test = X[-test_size:]
 
-            X_mesh_train = mesh_X[:-test_size]
-            X_mesh_test = mesh_X[-test_size:]
+            if (dim < 4):
+                X_mesh_train = mesh_X[:-test_size]
+                X_mesh_test = mesh_X[-test_size:]
 
             
             dummy_ys = [dummy_y1,dummy_y2,dummy_y3]
@@ -248,21 +256,22 @@ if __name__ == "__main__":
 
                 
                 ### NDCNN
-                NDCNNmodel = ConvNDClassifier(y.shape[1],nx,sample)
-                NDCNNmodel.compile(loss='binary_crossentropy', optimizer='adam')
-                NDCNNmodel.fit(
-                    X_mesh_train, y[:-test_size],
-                    epochs=50,
-                    batch_size=32,
-                    shuffle=True,
-                    validation_data=(X_mesh_test, y[-test_size:]),
-                    verbose=0
-                )
-                y_dummy_pred = NDCNNmodel.predict(X_mesh_test)
-                y_pred = np.argmax(y_dummy_pred, axis=1)
-                score = f1_score(real_y[-test_size:], y_pred, average='macro')
-                print("NDCNN",dim, prob, score)
-                f1_results["NDCNN"][f"d{dim} {prob}"] = score
+                if (dim < 4):
+                    NDCNNmodel = ConvNDClassifier(y.shape[1],nx,sample)
+                    NDCNNmodel.compile(loss='binary_crossentropy', optimizer='adam')
+                    NDCNNmodel.fit(
+                        X_mesh_train, y[:-test_size],
+                        epochs=50,
+                        batch_size=32,
+                        shuffle=True,
+                        validation_data=(X_mesh_test, y[-test_size:]),
+                        verbose=0
+                    )
+                    y_dummy_pred = NDCNNmodel.predict(X_mesh_test)
+                    y_pred = np.argmax(y_dummy_pred, axis=1)
+                    score = f1_score(real_y[-test_size:], y_pred, average='macro')
+                    print("NDCNN",dim, prob, score)
+                    f1_results["NDCNN"][f"d{dim} {prob}"] = score
 
 
                 #StructuralInformedDense
