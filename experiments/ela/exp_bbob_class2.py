@@ -10,7 +10,6 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import f1_score
-import autosklearn.classification
 
 import bbobbenchmarks as bbob
 from doe2vec import doe_model
@@ -25,7 +24,7 @@ from sklearn.metrics import (classification_report, confusion_matrix,
                              multilabel_confusion_matrix)
 from sklearn.model_selection import cross_val_score
 from sklearn.preprocessing import LabelBinarizer
-from CEOELA_main import run_ELA
+#from CEOELA_main import run_ELA
 from codecarbon import EmissionsTracker
 
 
@@ -59,8 +58,9 @@ def plot_confusion_matrix(y_test, y_scores, classNames, title="confusion_matrix"
 """
 f1_results = {}
 calc_ela = False
-all_dims = [2,5,10,20,40]
+all_dims = [2,5,10,20]
 latent_dim = 24
+reps = 10
 for model_type in ["AE", "VAE"]:
     for latent_dim in [16,24,32]:
         f1_results[model_type+str(latent_dim)] = {}
@@ -148,24 +148,28 @@ for model_type in ["AE", "VAE"]:
             X_train = X[:-test_size]
             X_test = X[-test_size:]
 
-            rf = RandomForestClassifier(n_estimators=100)
-            rf.fit(X_train, y_1[:-test_size])
+            f1_results[model_type+str(latent_dim)][f"d{dim} multimodal"] = []
+            f1_results[model_type+str(latent_dim)][f"d{dim} global"] = []
+            f1_results[model_type+str(latent_dim)][f"d{dim} funnel"] = []
+            for rep in range(reps):
+                rf = RandomForestClassifier(n_estimators=100)
+                rf.fit(X_train, y_1[:-test_size])
 
-            resRf = rf.predict(X_test)
-            f1_macro = f1_score(y_1[-test_size:], resRf, average='macro')
-            f1_results[model_type+str(latent_dim)][f"d{dim} multimodal"] = f1_macro
+                resRf = rf.predict(X_test)
+                f1_macro = f1_score(y_1[-test_size:], resRf, average='macro')
+                f1_results[model_type+str(latent_dim)][f"d{dim} multimodal"].append(f1_macro)
 
-            rf = RandomForestClassifier(n_estimators=100)
-            rf.fit(X_train, y_2[:-test_size])
-            resRf = rf.predict(X_test)
-            f1_macro = f1_score(y_2[-test_size:], resRf, average='macro')
-            f1_results[model_type+str(latent_dim)][f"d{dim} global"] = f1_macro
+                rf = RandomForestClassifier(n_estimators=100)
+                rf.fit(X_train, y_2[:-test_size])
+                resRf = rf.predict(X_test)
+                f1_macro = f1_score(y_2[-test_size:], resRf, average='macro')
+                f1_results[model_type+str(latent_dim)][f"d{dim} global"].append(f1_macro)
 
-            rf = RandomForestClassifier(n_estimators=100)
-            rf.fit(X_train, y_3[:-test_size])
-            resRf = rf.predict(X_test)
-            f1_macro = f1_score(y_3[-test_size:], resRf, average='macro')
-            f1_results[model_type+str(latent_dim)][f"d{dim} funnel"] = f1_macro
+                rf = RandomForestClassifier(n_estimators=100)
+                rf.fit(X_train, y_3[:-test_size])
+                resRf = rf.predict(X_test)
+                f1_macro = f1_score(y_3[-test_size:], resRf, average='macro')
+                f1_results[model_type+str(latent_dim)][f"d{dim} funnel"].append(f1_macro)
 
             print(f1_results)
 

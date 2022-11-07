@@ -1,5 +1,6 @@
 import json
-  
+import numpy as np
+
 # Opening JSON file
 f = open('f1_results.json')
   
@@ -19,6 +20,6 @@ print("\\midrule")
 for prob in data["AE16"]:
     print(prob + "\t&\t", end="")
     for alg in data:
-        print(format(data[alg][prob],".3f"), end="")
+        print(format(np.mean(data[alg][prob]),".3f"), "("+format(np.std(data[alg][prob]),".3f")+")", end="")
         print("\t&\t", end="")
     print("\\\\")

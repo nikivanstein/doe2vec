@@ -19,6 +19,9 @@ print("\\midrule")
 for prob in data["dense"]:
     print(prob + "\t&\t", end="")
     for alg in data:
-        print(format(data[alg][prob],".3f"), end="")
+        if (prob in data[alg]):
+            print(format(data[alg][prob],".3f"), end="")
+        else:
+            print("-", end="")
         print("\t&\t", end="")
     print("\\\\")
