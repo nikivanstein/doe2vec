@@ -47,19 +47,28 @@ class StructuralInformedDense(Model):
         self.sample_size = sample_size
         self.classifier = self._classifier()
 
+    def knnLayer(self, input, sample_size, locations, overlap=True):
+        #Generalize like knn-cnn, with strides (include points once / always)
+        #allow for stacking, give new location (by averaging) to new point
 
-    def _classifier(self):
-        '''Create a Dense network with shape information from the DOE'''
-        #we use knowledge of the space filling design to determine the distance threshold
-        inputTensor = Input((self.sample_size,))
-        connections = np.zeros((self.sample_size,self.sample_size))
+        connections = np.zeros((sample_size,))
         pair_distances = pairwise_distances(self.DOE, metric='cityblock')
         for i in range(0,len(self.DOE)):
             indexes_to_use = np.argsort(pair_distances[i,:])[:self.dim * 2 + 1]
             connections[indexes_to_use, i] = 1
         tf_connections = tf.convert_to_tensor(connections, dtype=tf.float32)
 
-        x = CustomConnected(self.sample_size, tf_connections, activation="relu")(inputTensor)
+        x = CustomConnected(self.sample_size, tf_connections, activation="relu")(input)
+        return x
+
+    def _classifier(self):
+        '''Create a Dense network with shape information from the DOE'''
+        #we use knowledge of the space filling design to determine the distance threshold
+
+        
+        inputTensor = Input((self.sample_size,))
+        x = self.knnLayer(inputTensor, self.sample_size, self.DOE)
+
         for num_nodes in self.layer_sizes:
             x = Dense(num_nodes, activation="relu")(x)
         x = Dropout(0.2)(x)
