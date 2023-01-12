@@ -13,6 +13,7 @@ from sklearn.metrics import f1_score
 import json
 from keras.utils import np_utils
 from convnd import ConvND
+import copy
 
 
 class CustomConnected(Dense):
@@ -36,30 +37,53 @@ class CustomConnected(Dense):
         return output
 
 class StructuralInformedDense(Model):
-    def __init__(self, layer_sizes, num_classes, sample_size, DOE):
+    def __init__(self, num_knn_layers, layer_sizes, num_classes, sample_size, DOE, overlap=False):
         """Dense classifier with custom connections based on the DOE between input and first hidden layer.
         """
         super(StructuralInformedDense, self).__init__()
         self.layer_sizes = layer_sizes
+        self.num_knn_layers = num_knn_layers
         self.DOE = DOE
         self.num_classes = num_classes
         self.dim = self.DOE.shape[1]
         self.sample_size = sample_size
+        self.overlap = overlap
         self.classifier = self._classifier()
 
-    def knnLayer(self, input, sample_size, locations, overlap=True):
+    def knnLayer(self, input, sample_size, locations, overlap=False, k=None):
         #Generalize like knn-cnn, with strides (include points once / always)
         #allow for stacking, give new location (by averaging) to new point
-
-        connections = np.zeros((sample_size,))
-        pair_distances = pairwise_distances(self.DOE, metric='cityblock')
-        for i in range(0,len(self.DOE)):
-            indexes_to_use = np.argsort(pair_distances[i,:])[:self.dim * 2 + 1]
-            connections[indexes_to_use, i] = 1
+        if k == None:
+            k = self.dim * 2 + 1
+        output_size = self.sample_size
+        pair_distances = pairwise_distances(locations, metric='cityblock')
+        if (overlap):
+            connections = np.zeros((sample_size, sample_size))
+            new_locations = np.zeros((sample_size,self.dim))
+            for i in range(0,len(locations)):
+                indexes_to_use = np.argsort(pair_distances[i,:])[:k]
+                connections[indexes_to_use, i] = 1
+                new_locations[i] = np.mean(locations[indexes_to_use], axis=0)
+        else:
+            indexes_used = np.zeros(len(locations), dtype=bool)
+            groups = []
+            for i in range(0,len(locations)):
+                if (not indexes_used[i]):
+                    pair_distances = pairwise_distances(locations, metric='cityblock')
+                    #update the used indexes
+                    indexes_to_use = np.argsort(pair_distances[i,:])[:k]
+                    indexes_used[indexes_to_use] = True
+                    groups.append(indexes_to_use)
+            connections = np.zeros((sample_size,len(groups)))
+            new_locations = np.zeros((len(groups),self.dim))
+            for i in range(0,len(groups)):
+                connections[groups[i], i] = 1
+                new_locations[i] = np.mean(locations[groups[i]], axis=0)
+            output_size = len(groups)
         tf_connections = tf.convert_to_tensor(connections, dtype=tf.float32)
 
-        x = CustomConnected(self.sample_size, tf_connections, activation="relu")(input)
-        return x
+        x = CustomConnected(output_size, tf_connections, activation="relu")(input)
+        return x, new_locations
 
     def _classifier(self):
         '''Create a Dense network with shape information from the DOE'''
@@ -67,7 +91,9 @@ class StructuralInformedDense(Model):
 
         
         inputTensor = Input((self.sample_size,))
-        x = self.knnLayer(inputTensor, self.sample_size, self.DOE)
+        x, new_locations = self.knnLayer(inputTensor, self.sample_size, self.DOE, self.overlap)
+        for i in range(self.num_knn_layers - 1):
+            x, new_locations = self.knnLayer(x, len(new_locations), new_locations, self.overlap)
 
         for num_nodes in self.layer_sizes:
             x = Dense(num_nodes, activation="relu")(x)
@@ -281,10 +307,12 @@ if __name__ == "__main__":
                     score = f1_score(real_y[-test_size:], y_pred, average='macro')
                     print("NDCNN",dim, prob, score)
                     f1_results["NDCNN"][f"d{dim} {prob}"] = score
+                else:
+                    f1_results["NDCNN"][f"d{dim} {prob}"] = -1
 
 
                 #StructuralInformedDense
-                cf = StructuralInformedDense([128,64],y.shape[1],X.shape[1],sample)
+                cf = StructuralInformedDense(2, [64],y.shape[1],X.shape[1],sample)
                 cf.compile(loss='binary_crossentropy', optimizer='adam')
                 cf.fit(
                     X_train, y[:-test_size],
@@ -328,7 +356,7 @@ if __name__ == "__main__":
             
 
 
-    with open('f1_results_class.json', 'w') as fp:
+    with open('new_results_class.json', 'w') as fp:
         json.dump(f1_results, fp)
         
 

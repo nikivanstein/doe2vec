@@ -4,7 +4,7 @@ import tensorflow as tf
 from tensorflow.keras import layers, losses
 from tensorflow.keras.models import Model
 import numpy as np
-from keras.layers import Dense, Input, Concatenate, Lambda
+from keras.layers import Dense, Input, Concatenate, Lambda, Flatten, Dropout
 from keras.utils.vis_utils import plot_model
 from sklearn.metrics import pairwise_distances
 import keras.backend as K
@@ -33,10 +33,13 @@ class Autoencoder(Model):
         decoded = self.decoder(encoded)
         return decoded
 
+
 class CustomConnected(Dense):
 
     def __init__(self,units,connections,**kwargs):
-
+        """Custom dense layer with structural information in the 
+        connections.
+        """
         #this is matrix A
         self.connections = connections                        
 
@@ -50,6 +53,75 @@ class CustomConnected(Dense):
         if self.activation is not None:
             output = self.activation(output)
         return output
+
+class StructuralInformedDense(Model):
+    def __init__(self, num_knn_layers, layer_sizes, num_classes, sample_size, DOE, overlap=False):
+        """Dense classifier with custom connections based on the DOE between input and first hidden layer.
+        """
+        super(StructuralInformedDense, self).__init__()
+        self.layer_sizes = layer_sizes
+        self.num_knn_layers = num_knn_layers
+        self.DOE = DOE
+        self.num_classes = num_classes
+        self.dim = self.DOE.shape[1]
+        self.sample_size = sample_size
+        self.overlap = overlap
+        self.classifier = self._classifier()
+
+    def knnLayer(self, input, sample_size, locations, overlap=False, k=None):
+        #Generalize like knn-cnn, with strides (include points once / always)
+        #allow for stacking, give new location (by averaging) to new point
+        if k == None:
+            k = self.dim * 2 + 1
+        output_size = self.sample_size
+        pair_distances = pairwise_distances(locations, metric='cityblock')
+        if (overlap):
+            connections = np.zeros((sample_size, sample_size))
+            new_locations = np.zeros((sample_size,self.dim))
+            for i in range(0,len(locations)):
+                indexes_to_use = np.argsort(pair_distances[i,:])[:k]
+                connections[indexes_to_use, i] = 1
+                new_locations[i] = np.mean(locations[indexes_to_use], axis=0)
+        else:
+            indexes_used = np.zeros(len(locations), dtype=bool)
+            groups = []
+            for i in range(0,len(locations)):
+                if (not indexes_used[i]):
+                    pair_distances = pairwise_distances(locations, metric='cityblock')
+                    #update the used indexes
+                    indexes_to_use = np.argsort(pair_distances[i,:])[:k]
+                    indexes_used[indexes_to_use] = True
+                    groups.append(indexes_to_use)
+            connections = np.zeros((sample_size,len(groups)))
+            new_locations = np.zeros((len(groups),self.dim))
+            for i in range(0,len(groups)):
+                connections[groups[i], i] = 1
+                new_locations[i] = np.mean(locations[groups[i]], axis=0)
+            output_size = len(groups)
+        tf_connections = tf.convert_to_tensor(connections, dtype=tf.float32)
+
+        x = CustomConnected(output_size, tf_connections, activation="relu")(input)
+        return x, new_locations
+
+    def _classifier(self):
+        '''Create a Dense network with shape information from the DOE'''
+        #we use knowledge of the space filling design to determine the distance threshold
+
+        
+        inputTensor = Input((self.sample_size,))
+        x, new_locations = self.knnLayer(inputTensor, self.sample_size, self.DOE, self.overlap)
+        for i in range(self.num_knn_layers - 1):
+            x, new_locations = self.knnLayer(x, len(new_locations), new_locations, self.overlap)
+
+        for num_nodes in self.layer_sizes:
+            x = Dense(num_nodes, activation="relu")(x)
+        x = Dropout(0.2)(x)
+        x = Dense(self.num_classes, activation="sigmoid")(x)
+        classifier = tf.keras.Model(inputTensor, x, name="StructuralInformedDense")
+        return classifier
+
+    def call(self, x):
+        return self.classifier(x)
 
 class CustomAutoencoder(Model):
     def __init__(self, latent_dim, sample_size, DOE):
@@ -67,28 +139,49 @@ class CustomAutoencoder(Model):
             ]
         )
 
+    def knnLayer(self, input, sample_size, locations, overlap=False, k=None):
+        #Generalize like knn-cnn, with strides (include points once / always)
+        #allow for stacking, give new location (by averaging) to new point
+        if k == None:
+            k = self.dim * 2 + 1
+        output_size = self.sample_size
+        pair_distances = pairwise_distances(locations, metric='cityblock')
+        if (overlap):
+            connections = np.zeros((sample_size, sample_size))
+            new_locations = np.zeros((sample_size,self.dim))
+            for i in range(0,len(locations)):
+                indexes_to_use = np.argsort(pair_distances[i,:])[:k]
+                connections[indexes_to_use, i] = 1
+                new_locations[i] = np.mean(locations[indexes_to_use], axis=0)
+        else:
+            indexes_used = np.zeros(len(locations), dtype=bool)
+            groups = []
+            for i in range(0,len(locations)):
+                if (not indexes_used[i]):
+                    pair_distances = pairwise_distances(locations, metric='cityblock')
+                    #update the used indexes
+                    indexes_to_use = np.argsort(pair_distances[i,:])[:k]
+                    indexes_used[indexes_to_use] = True
+                    groups.append(indexes_to_use)
+            connections = np.zeros((sample_size,len(groups)))
+            new_locations = np.zeros((len(groups),self.dim))
+            for i in range(0,len(groups)):
+                connections[groups[i], i] = 1
+                new_locations[i] = np.mean(locations[groups[i]], axis=0)
+            output_size = len(groups)
+        tf_connections = tf.convert_to_tensor(connections, dtype=tf.float32)
+        x = CustomConnected(output_size, tf_connections, activation="relu")(input)
+        return x, new_locations
 
     def _encoder(self):
-        '''Create a Dense network with shape information from the DOE'''
+        '''Create a Sparse network with shape information from the DOE'''
         import matplotlib.pyplot as plt
         #we use knowledge of the space filling design to determine the distance threshold
         inputTensor = Input((self.sample_size,))
         sorted_DOE = np.argsort(self.DOE, axis=0)
-        print("sorted DOE", sorted_DOE)
-        connections = np.zeros((self.sample_size,self.sample_size))
-        pair_distances = pairwise_distances(self.DOE, metric='cityblock')
-        print("pair_distances", pair_distances[0])
-        for i in range(0,len(self.DOE)):
-            indexes_to_use = np.argsort(pair_distances[i,:])[:self.dim * 2 + 1]
-            plt.plot(self.DOE[indexes_to_use,0],self.DOE[indexes_to_use,1], '-o', alpha=0.4)
-            connections[indexes_to_use, i] = 1
-        tf_connections = tf.convert_to_tensor(connections, dtype=tf.float32)
-        print("connections",connections)
-        plt.savefig("connections.png")
 
-        #x = Concatenate()(groups)
-        x = CustomConnected(self.sample_size, tf_connections, activation="relu")(inputTensor)
-        x = Dense(self.sample_size / 2, activation="relu")(x)
+        x, new_locations = self.knnLayer(inputTensor, len(sorted_DOE), sorted_DOE, False)
+        x, _ = self.knnLayer(x, len(new_locations), new_locations, False)
         x = Dense(self.sample_size / 4, activation="relu")(x)
         x = Dense(self.latent_dim, activation="relu")(x)
         encoder = tf.keras.Model(inputTensor, x, name="encoder")
