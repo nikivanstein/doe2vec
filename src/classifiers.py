@@ -91,10 +91,13 @@ class StructuralInformedDense(Model):
 
         
         inputTensor = Input((self.sample_size,))
+        skip = Dense(self.sample_size, activation="relu")(inputTensor)
+
         x, new_locations = self.knnLayer(inputTensor, self.sample_size, self.DOE, self.overlap)
         for i in range(self.num_knn_layers - 1):
             x, new_locations = self.knnLayer(x, len(new_locations), new_locations, self.overlap)
 
+        x = Concatenate(axis=1)([x, skip])
         for num_nodes in self.layer_sizes:
             x = Dense(num_nodes, activation="relu")(x)
         x = Dropout(0.2)(x)
@@ -161,7 +164,7 @@ if __name__ == "__main__":
     """
     f1_results = {}
     calc_ela = False
-    all_dims = [2,3,5,10,20]#,10,20,40]
+    all_dims = [5,10,20,30]#,10,20,40]
     latent_dim = 24
     nxs = [30,20]
     m=9 #number of samples
@@ -312,11 +315,11 @@ if __name__ == "__main__":
 
 
                 #StructuralInformedDense
-                cf = StructuralInformedDense(2, [64],y.shape[1],X.shape[1],sample)
+                cf = StructuralInformedDense(4, [256,128,64],y.shape[1],X.shape[1],sample,False)
                 cf.compile(loss='binary_crossentropy', optimizer='adam')
                 cf.fit(
                     X_train, y[:-test_size],
-                    epochs=50,
+                    epochs=100,
                     batch_size=32,
                     shuffle=True,
                     validation_data=(X_test, y[-test_size:]),
@@ -340,7 +343,7 @@ if __name__ == "__main__":
                 denseModel.compile(loss='binary_crossentropy', optimizer='adam')
                 denseModel.fit(
                     X_train, y[:-test_size],
-                    epochs=50,
+                    epochs=100,
                     batch_size=32,
                     shuffle=True,
                     validation_data=(X_test, y[-test_size:]),

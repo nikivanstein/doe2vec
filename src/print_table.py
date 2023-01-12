@@ -1,7 +1,7 @@
 import json
   
 # Opening JSON file
-f = open('f1_results_class.json')
+f = open('new_results_class.json')
   
 # returns JSON object as 
 # a dictionary
