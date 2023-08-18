@@ -42,6 +42,7 @@ class doe_model:
         use_mlflow=False,
         mlflow_name="Doc2Vec",
         model_type="VAE",
+        data_augmentation=True,
     ):
         """Doe2Vec model to transform Design of Experiments to feature vectors.
 
@@ -57,6 +58,7 @@ class doe_model:
             mlflow_name (str, optional): The name to log the mlflow experiment. Defaults to "Doc2Vec".
             model_type (str, optional): The model to use, either "AE" or "VAE". Defaults to "VAE".
             use_bbob (bool, optional): To use BBOB functions in addition to random generated functions.
+            data_augmentation (bool, optional): To use rotation data augmentation for 2*dim times per sample. Defaults to True.
         """
         self.dim = dim
         self.m = m
@@ -66,6 +68,7 @@ class doe_model:
         self.seed = seed_nr
         self.use_VAE = False
         self.model_type = model_type
+        self.data_augmentation = data_augmentation
         self.fitted = False
         self.autoencoder = None
         if model_type == "VAE":
@@ -91,6 +94,7 @@ class doe_model:
             mlflow.log_param("m", self.m)
             mlflow.log_param("latent_dim", self.latent_dim)
             mlflow.log_param("seed", self.seed)
+            mlflow.log_param("data_augmentation", self.data_augmentation)
 
     def load_from_huggingface(self, repo="BasStein"):
         """Load a pre-trained model from a HuggingFace repository.
@@ -105,6 +109,7 @@ class doe_model:
         self.autoencoder.compile(optimizer="adam")
         self.functions = dataset["function"]
         self.Y = []
+        self.X = []
         array_x = (
             self.sample
         )  # this seemingly unused variable is required by the eval() later on
@@ -118,11 +123,16 @@ class doe_model:
                 array_y = (array_y - np.min(array_y)) / (
                     np.max(array_y) - np.min(array_y)
                 )
-                self.Y.append(array_y)
+                #add data augmentation
+                if self.data_augmentation:
+                    pass
+                else:
+                    self.Y.append(array_y)
+                    self.X.append(array_y)
             except:
                 continue
         warnings.simplefilter("default")
-        self.setData(self.Y)
+        self.setData(self.X, self.Y)
         print("Loaded huggingface model and data")
         self.summary()
         self.fitNN()
@@ -160,6 +170,7 @@ class doe_model:
         if os.path.exists(f"{dir}/functions_d{self.dim}-n{self.n}.npy"):
             self.functions = np.load(f"{dir}/functions_d{self.dim}-n{self.n}.npy")
             self.Y = []
+            self.X = []
             array_x = (
                 self.sample
             )  # this seemingly unused variable is required by the eval() later on
@@ -173,11 +184,16 @@ class doe_model:
                     array_y = (array_y - np.min(array_y)) / (
                         np.max(array_y) - np.min(array_y)
                     )
-                    self.Y.append(array_y)
+                    #add data augmentation
+                    if self.data_augmentation:
+                        pass
+                    else:
+                        self.Y.append(array_y)
+                        self.X.append(array_y)
                 except:
                     continue
             warnings.simplefilter("default")
-            self.setData(self.Y)
+            self.setData(self.X, self.Y)
             print("Loaded data")
             return True
         return False
@@ -227,26 +243,34 @@ class doe_model:
                     np.max(array_y) - np.min(array_y)
                 )
                 self.functions.append(fun)
-                self.Y.append(array_y)
+                if self.data_augmentation:
+                    #add data augmentation! rotate in all dimensions
+                    pass
+                else:
+                    self.Y.append(array_y)
+                    self.X.append(array_y)
+
             except:
                 continue
         warnings.simplefilter("default")
-        self.Y = np.array(self.Y)
+        self.setData(self.X, self.Y)
         self.functions = np.array(self.functions)
-        self.train_data = tf.cast(self.Y[:-50], tf.float32)
-        self.test_data = tf.cast(self.Y[-50:], tf.float32)
 
-        return self.Y
+        return self.X, self.Y
 
-    def setData(self, Y):
+    def setData(self, X, Y, test_size=100):
         """Helper function to load the data and split in train validation sets.
 
         Args:
             Y (nd array): the data set to use.
         """
         self.Y = np.array(Y)
-        self.train_data = tf.cast(self.Y[:-50], tf.float32)
-        self.test_data = tf.cast(self.Y[-50:], tf.float32)
+        self.X = np.array(X)
+        self.train_dataY = tf.cast(self.Y[:-test_size], tf.float32)
+        self.test_dataY = tf.cast(self.Y[-test_size:], tf.float32)
+        self.train_dataX = tf.cast(self.X[:-test_size], tf.float32)
+        self.test_dataX = tf.cast(self.X[-test_size:], tf.float32)
+        
 
     def compile(self):
         """Compile the autoencoder architecture."""
@@ -272,21 +296,21 @@ class doe_model:
             mlflow.tensorflow.autolog(every_n_iter=1)
         if self.use_VAE:
             self.autoencoder.fit(
-                self.train_data,
+                (self.train_dataX,self.train_dataY),
                 epochs=epochs,
                 batch_size=128,
                 shuffle=True,
-                validation_data=(self.test_data, self.test_data),
+                validation_data=(self.test_dataX, self.test_dataY),
                 **kwargs,
             )
         else:
             self.autoencoder.fit(
-                self.train_data,
-                self.train_data,
+                self.train_dataX,
+                self.train_dataY,
                 epochs=epochs,
                 batch_size=128,
                 shuffle=True,
-                validation_data=(self.test_data, self.test_data),
+                validation_data=(self.test_dataX, self.test_dataY),
                 **kwargs,
             )
         self.fitNN()
@@ -411,9 +435,9 @@ class doe_model:
             n (int, optional): The number of validation DOEs to show. Defaults to 5.
         """
         if self.use_VAE:
-            encoded_does, _z_log_var, _z = self.autoencoder.encoder(self.test_data)
+            encoded_does, _z_log_var, _z = self.autoencoder.encoder(self.test_dataX)
         else:
-            encoded_does = self.autoencoder.encoder(self.test_data).numpy()
+            encoded_does = self.autoencoder.encoder(self.test_dataX).numpy()
         decoded_does = self.autoencoder.decoder(encoded_does).numpy()
         fig = plt.figure(figsize=(n * 4, 8))
         for i in range(n):
