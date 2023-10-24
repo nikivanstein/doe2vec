@@ -21,6 +21,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.neighbors import NearestNeighbors
 from tensorflow.keras import layers, losses
 from tensorflow.keras.models import Model
+from tqdm import tqdm
 
 import bbobbenchmarks as bbob
 from models import VAE, Autoencoder
@@ -94,7 +95,7 @@ class doe_model:
             mlflow.log_param("m", self.m)
             mlflow.log_param("latent_dim", self.latent_dim)
             mlflow.log_param("seed", self.seed)
-            mlflow.log_param("data_augmentation", self.data_augmentation)
+            mlflow.log_param("augment", self.augment)
 
     def load_from_huggingface(self, repo="BasStein"):
         """Load a pre-trained model from a HuggingFace repository.
@@ -110,12 +111,9 @@ class doe_model:
         self.functions = dataset["function"]
         self.Y = []
         self.Y_out = []
-        array_x = (
-            self.sample
-        )  # this seemingly unused variable is required by the eval() later on
         if not sys.warnoptions:
             warnings.simplefilter("ignore")
-        for fun in self.functions:
+        for fun in tqdm(self.functions):
             try:
                 self.processFunction(fun)
             except:
@@ -154,6 +152,7 @@ class doe_model:
         Args:
             fun (string): The function to process
         """
+        array_x = (self.sample) #is used in eval (so it is used! don't remove)
         array_y = eval(fun)
         if (
             np.isnan(array_y).any()
@@ -164,7 +163,7 @@ class doe_model:
             or array_y.ndim != 1
         ):
             raise Exception("y values are nan, too small or too big.")
-        array_y_copy = array_y.copy()
+        array_x_copy = array_x.copy()
         # normalize the train data (this should be done per row (not per column!))
         array_y = array_y.flatten()
         array_y = (array_y - np.min(array_y)) / (
@@ -173,10 +172,11 @@ class doe_model:
         self.Y.append(array_y)
         self.Y_out.append(array_y)
         if self.augment:
-            for rot in np.arange(len(array_y_rot.shape[1])):
-                array_y_rot = array_y_copy
+            for rot in np.arange(array_x.shape[1]):
+                array_x = array_x_copy
                 #rotate in one axes
-                array_y_rot[:,rot] = array_y_rot[:,rot] * -1
+                array_x[:,rot] = array_x[:,rot] * -1
+                array_y_rot = eval(fun)
                 array_y_rot = array_y_rot.flatten()
                 array_y_rot = (array_y_rot - np.min(array_y_rot)) / (
                     np.max(array_y_rot) - np.min(array_y_rot)
@@ -198,12 +198,9 @@ class doe_model:
             self.functions = np.load(f"{dir}/functions_d{self.dim}-n{self.n}.npy")
             self.Y = []
             self.Y_out = []
-            array_x = (
-                self.sample
-            )  # this seemingly unused variable is required by the eval() later on
             if not sys.warnoptions:
                 warnings.simplefilter("ignore")
-            for fun in self.functions:
+            for fun in tqdm(self.functions):
                 try:
                     self.processFunction(fun)
                 except:
@@ -228,14 +225,14 @@ class doe_model:
         Returns:
             array: array with evaluated random functions on sample.
         """
-        array_x = self.sample  # it is required to be named array_x for the eval
         self.Y = []
         self.Y_out = []
         self.functions = []
         tries = 0
         if not sys.warnoptions:
             warnings.simplefilter("ignore")
-        while len(self.Y) < self.n:
+        progress_bar = iter(tqdm(range(self.n)))
+        while len(self.functions) < self.n:
             tries += 1
             # create an artificial function
             tree = genTree.generate_tree(6, 16)
@@ -247,7 +244,8 @@ class doe_model:
                 # normalize the train data (this should be done per row (not per column!))
                 self.processFunction(fun)
                 self.functions.append(fun)
-            except:
+                next(progress_bar)
+            except Exception:
                 continue
         warnings.simplefilter("default")
         self.Y = np.array(self.Y)
@@ -495,6 +493,11 @@ if __name__ == "__main__":
         use_mlflow=False,
         model_type="VAE",
     )
-    obj.load_from_huggingface()
+
+    obj.generateData()
+    obj.compile()
+    obj.fit(100)
+    obj.save(model_dir="/data/doe2vec/model/", data_dir="data/doe2vec/data/")
+    #obj.load_from_huggingface()
     # test the model
     obj.plot_label_clusters_bbob()
