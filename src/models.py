@@ -262,10 +262,11 @@ class VAE(Model):
         ]
 
     def train_step(self, data):
+        d, v = data
         with tf.GradientTape() as tape:
-            z_mean, z_log_var, z, reconstruction = self(data, training=True)
+            z_mean, z_log_var, z, reconstruction = self(d, training=True)
             reconstruction_loss = tf.reduce_mean(
-                tf.square(data - reconstruction)
+                tf.square(v - reconstruction)
             )  # MeanSquaredError
             kl_loss = -0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
             kl_loss = tf.reduce_mean(kl_loss)
@@ -285,7 +286,7 @@ class VAE(Model):
         d, v = data
         z_mean, z_log_var, z, reconstruction = self(d)
         reconstruction_loss = tf.reduce_mean(
-            tf.square(d - reconstruction)
+            tf.square(v - reconstruction)
         )  # MeanSquaredError
         kl_loss = -0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
         kl_loss = tf.reduce_mean(kl_loss)

@@ -35,6 +35,7 @@ class doe_model:
         dim,
         m,
         n=250000,
+        augment=True,
         latent_dim=32,
         seed_nr=0,
         kl_weight=0.001,
@@ -49,6 +50,7 @@ class doe_model:
             dim (int): Number of dimensions of the DOE
             m (int): Power for number of samples used in the Sobol sampler (not used for custom_sample)
             n (int, optional): Number of generated functions to use a training data. Defaults to 1000.
+            augment (boolean, optional): Add data augmentation by rotation, this increases the training data dim times. Defaults to True.
             latent_dim (int, optional): Number of dimensions in the latent space (vector size). Defaults to 16.
             seed_nr (int, optional): Random seed. Defaults to 0.
             kl_weight (float, optional): Defaults to 0.1.
@@ -64,6 +66,7 @@ class doe_model:
         self.kl_weight = kl_weight
         self.latent_dim = latent_dim
         self.seed = seed_nr
+        self.augment = augment
         self.use_VAE = False
         self.model_type = model_type
         self.fitted = False
@@ -105,6 +108,7 @@ class doe_model:
         self.autoencoder.compile(optimizer="adam")
         self.functions = dataset["function"]
         self.Y = []
+        self.Y_out = []
         array_x = (
             self.sample
         )  # this seemingly unused variable is required by the eval() later on
@@ -112,17 +116,11 @@ class doe_model:
             warnings.simplefilter("ignore")
         for fun in self.functions:
             try:
-                array_y = eval(fun)
-                # normalize the train data (this should be done per row (not per column!))
-                array_y = array_y.flatten()
-                array_y = (array_y - np.min(array_y)) / (
-                    np.max(array_y) - np.min(array_y)
-                )
-                self.Y.append(array_y)
+                self.processFunction(fun)
             except:
                 continue
         warnings.simplefilter("default")
-        self.setData(self.Y)
+        self.setData(self.Y, self.Y_out)
         print("Loaded huggingface model and data")
         self.summary()
         self.fitNN()
@@ -147,6 +145,44 @@ class doe_model:
             self.summary()
             return True
         return False
+    
+
+    def processFunction(self, fun):
+        """Process a function string into Y and Y_out values.
+
+        Args:
+            fun (string): The function to process
+        """
+        array_y = eval(fun)
+        if (
+            np.isnan(array_y).any()
+            or np.isinf(array_y).any()
+            or np.any(abs(array_y) < 1e-8)
+            or np.any(abs(array_y) > 1e8)
+            or np.var(array_y) < 1.0
+            or array_y.ndim != 1
+        ):
+            raise Exception("y values are nan, too small or too big.")
+        array_y_copy = array_y.copy()
+        # normalize the train data (this should be done per row (not per column!))
+        array_y = array_y.flatten()
+        array_y = (array_y - np.min(array_y)) / (
+            np.max(array_y) - np.min(array_y)
+        )
+        self.Y.append(array_y)
+        self.Y_out.append(array_y)
+        if self.augment:
+            for rot in np.arange(len(array_y_rot.shape[1])):
+                array_y_rot = array_y_copy
+                #rotate in one axes
+                array_y_rot[:,rot] = array_y_rot[:,rot] * -1
+                array_y_rot = array_y_rot.flatten()
+                array_y_rot = (array_y_rot - np.min(array_y_rot)) / (
+                    np.max(array_y_rot) - np.min(array_y_rot)
+                )
+                self.Y.append(array_y_rot)
+                self.Y_out.append(array_y)
+        return
 
     def loadData(self, dir="data"):
         """Load a stored functions file and retrieve all the landscapes.
@@ -160,6 +196,7 @@ class doe_model:
         if os.path.exists(f"{dir}/functions_d{self.dim}-n{self.n}.npy"):
             self.functions = np.load(f"{dir}/functions_d{self.dim}-n{self.n}.npy")
             self.Y = []
+            self.Y_out = []
             array_x = (
                 self.sample
             )  # this seemingly unused variable is required by the eval() later on
@@ -167,17 +204,11 @@ class doe_model:
                 warnings.simplefilter("ignore")
             for fun in self.functions:
                 try:
-                    array_y = eval(fun)
-                    # normalize the train data (this should be done per row (not per column!))
-                    array_y = array_y.flatten()
-                    array_y = (array_y - np.min(array_y)) / (
-                        np.max(array_y) - np.min(array_y)
-                    )
-                    self.Y.append(array_y)
+                    self.processFunction(fun)
                 except:
                     continue
             warnings.simplefilter("default")
-            self.setData(self.Y)
+            self.setData(self.Y, self.Y_out)
             print("Loaded data")
             return True
         return False
@@ -198,6 +229,7 @@ class doe_model:
         """
         array_x = self.sample  # it is required to be named array_x for the eval
         self.Y = []
+        self.Y_out = []
         self.functions = []
         tries = 0
         if not sys.warnoptions:
@@ -211,41 +243,31 @@ class doe_model:
                 exp, len(self.sample), self.sample.shape[1]
             )
             try:
-                array_y = eval(fun)
-                if (
-                    np.isnan(array_y).any()
-                    or np.isinf(array_y).any()
-                    or np.any(abs(array_y) < 1e-8)
-                    or np.any(abs(array_y) > 1e8)
-                    or np.var(array_y) < 1.0
-                    or array_y.ndim != 1
-                ):
-                    continue
                 # normalize the train data (this should be done per row (not per column!))
-                array_y = array_y.flatten()
-                array_y = (array_y - np.min(array_y)) / (
-                    np.max(array_y) - np.min(array_y)
-                )
+                self.processFunction(fun)
                 self.functions.append(fun)
-                self.Y.append(array_y)
             except:
                 continue
         warnings.simplefilter("default")
         self.Y = np.array(self.Y)
+        self.Y_out = np.array(self.Y_out)
         self.functions = np.array(self.functions)
         self.train_data = tf.cast(self.Y[:-50], tf.float32)
+        self.train_data_out = tf.cast(self.Y_out[:-50], tf.float32)
         self.test_data = tf.cast(self.Y[-50:], tf.float32)
 
-        return self.Y
+        return self.Y, self.Y_out
 
-    def setData(self, Y):
+    def setData(self, Y, Y_out):
         """Helper function to load the data and split in train validation sets.
 
         Args:
             Y (nd array): the data set to use.
         """
         self.Y = np.array(Y)
+        self.Y_out = np.array(Y_out)
         self.train_data = tf.cast(self.Y[:-50], tf.float32)
+        self.train_data_out = tf.cast(self.Y_out[:-50], tf.float32)
         self.test_data = tf.cast(self.Y[-50:], tf.float32)
 
     def compile(self):
@@ -270,25 +292,15 @@ class doe_model:
             raise AttributeError("Autoencoder model is not compiled yet")
         if self.use_mlflow:
             mlflow.tensorflow.autolog(every_n_iter=1)
-        if self.use_VAE:
-            self.autoencoder.fit(
-                self.train_data,
-                epochs=epochs,
-                batch_size=128,
-                shuffle=True,
-                validation_data=(self.test_data, self.test_data),
-                **kwargs,
-            )
-        else:
-            self.autoencoder.fit(
-                self.train_data,
-                self.train_data,
-                epochs=epochs,
-                batch_size=128,
-                shuffle=True,
-                validation_data=(self.test_data, self.test_data),
-                **kwargs,
-            )
+        self.autoencoder.fit(
+            self.train_data,
+            self.train_data_out,
+            epochs=epochs,
+            batch_size=128,
+            shuffle=True,
+            validation_data=(self.test_data, self.test_data),
+            **kwargs,
+        )
         self.fitNN()
         if self.use_mlflow:
             self.plot_label_clusters_bbob()
