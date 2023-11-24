@@ -2,7 +2,7 @@ import os.path
 import sys
 import warnings
 from statistics import mode
-
+import math
 import matplotlib.pyplot as plt
 import mlflow
 import mlflow.tensorflow
@@ -22,7 +22,10 @@ from sklearn.neighbors import NearestNeighbors
 from tensorflow.keras import layers, losses
 from tensorflow.keras.models import Model
 from tqdm import tqdm
+from sklearn.model_selection import cross_val_score
+from sklearn.ensemble import RandomForestClassifier
 
+from umap.umap_ import UMAP
 import bbobbenchmarks as bbob
 from models import VAE, Autoencoder
 from modulesRandFunc import generate_exp2fun as genExp2fun
@@ -43,7 +46,8 @@ class doe_model:
         custom_sample=None,
         use_mlflow=False,
         mlflow_name="Doc2Vec",
-        model_type="VAE"
+        model_type="VAE",
+        use_bbob=True
     ):
         """Doe2Vec model to transform Design of Experiments to feature vectors.
 
@@ -72,6 +76,7 @@ class doe_model:
         self.model_type = model_type
         self.fitted = False
         self.autoencoder = None
+        self.use_bbob = True
         if model_type == "VAE":
             self.use_VAE = True
             self.pure_model_type = self.model_type
@@ -154,6 +159,8 @@ class doe_model:
         """
         array_x = (self.sample) #is used in eval (so it is used! don't remove)
         array_y = eval(fun)
+        to_append_y = []
+        to_append_y_out = []
         if (
             np.isnan(array_y).any()
             or np.isinf(array_y).any()
@@ -169,20 +176,31 @@ class doe_model:
         array_y = (array_y - np.min(array_y)) / (
             np.max(array_y) - np.min(array_y)
         )
-        self.Y.append(array_y)
-        self.Y_out.append(array_y)
+        to_append_y.append(array_y)
+        to_append_y_out.append(array_y)
         if self.augment:
             for rot in np.arange(array_x.shape[1]):
                 array_x = array_x_copy
                 #rotate in one axes
                 array_x[:,rot] = array_x[:,rot] * -1
                 array_y_rot = eval(fun)
+                if (
+                    np.isnan(array_y_rot).any()
+                    or np.isinf(array_y_rot).any()
+                    or np.any(abs(array_y_rot) < 1e-8)
+                    or np.any(abs(array_y_rot) > 1e8)
+                    or np.var(array_y_rot) < 1.0
+                    or array_y_rot.ndim != 1
+                ):
+                    raise Exception("y values are nan, too small or too big.")
                 array_y_rot = array_y_rot.flatten()
                 array_y_rot = (array_y_rot - np.min(array_y_rot)) / (
                     np.max(array_y_rot) - np.min(array_y_rot)
                 )
-                self.Y.append(array_y_rot)
-                self.Y_out.append(array_y)
+                to_append_y.append(array_y_rot)
+                to_append_y_out.append(array_y)
+        self.Y.extend(to_append_y)
+        self.Y_out.extend(to_append_y_out)
         return
 
     def loadData(self, dir="data"):
@@ -232,21 +250,38 @@ class doe_model:
         if not sys.warnoptions:
             warnings.simplefilter("ignore")
         progress_bar = iter(tqdm(range(self.n)))
-        while len(self.functions) < self.n:
-            tries += 1
-            # create an artificial function
-            tree = genTree.generate_tree(6, 16)
-            exp = genTree2exp.generate_tree2exp(tree)
-            fun = genExp2fun.generate_exp2fun(
-                exp, len(self.sample), self.sample.shape[1]
-            )
-            try:
-                # normalize the train data (this should be done per row (not per column!))
-                self.processFunction(fun)
-                self.functions.append(fun)
-                next(progress_bar)
-            except Exception:
-                continue
+        if self.use_bbob:
+            for f in range(1,25):
+                for i in range(math.floor(self.n/24)):
+                    fun, _ = bbob.instantiate(f, i)
+                    bbob_y = np.asarray(list(map(fun, self.sample)))
+                    bbob_y = (bbob_y.flatten() - np.min(bbob_y)) / (
+                        np.max(bbob_y) - np.min(bbob_y)
+                    )
+                    if i == 0:
+                        array_y = bbob_y.copy()
+                    self.Y.append(bbob_y)
+                    if self.augment:
+                        self.Y_out.append(array_y)
+                    else:
+                        self.Y_out.append(bbob_y)
+                    next(progress_bar)
+        else:
+            while len(self.functions) < self.n:
+                tries += 1
+                # create an artificial function
+                tree = genTree.generate_tree(6, 16)
+                exp = genTree2exp.generate_tree2exp(tree)
+                fun = genExp2fun.generate_exp2fun(
+                    exp, len(self.sample), self.sample.shape[1]
+                )
+                try:
+                    # normalize the train data (this should be done per row (not per column!))
+                    self.processFunction(fun)
+                    self.functions.append(fun)
+                    next(progress_bar)
+                except Exception:
+                    continue
         warnings.simplefilter("default")
         self.Y = np.array(self.Y)
         self.Y_out = np.array(self.Y_out)
@@ -305,6 +340,7 @@ class doe_model:
         if self.use_mlflow:
             self.plot_label_clusters_bbob()
             self.visualizeTestData()
+            self.classifyBBOB()
             mlflow.end_run()
 
     def fitNN(self):
@@ -395,15 +431,12 @@ class doe_model:
 
         X = np.array(encodings)
         y = np.array(fuction_groups).flatten()
-        mds = manifold.MDS(
-            n_components=2,
-            random_state=self.seed,
-        )
-        embedding = mds.fit_transform(X).T
+        reducer = UMAP()
+        embedding = reducer.fit_transform(X)
         # display a 2D plot of the bbob functions in the latent space
 
         plt.figure(figsize=(12, 10))
-        plt.scatter(embedding[0], embedding[1], c=y, cmap=cm.jet)
+        plt.scatter(embedding[:,0], embedding[:,1], c=y, cmap=cm.jet)
         plt.colorbar()
         plt.xlabel("")
         plt.ylabel("")
@@ -416,6 +449,34 @@ class doe_model:
                 f"latent_space_{self.dim}-{self.m}-{self.latent_dim}-{self.seed}-{self.model_type}.png"
             )
 
+    def classifyBBOB(self):
+        encodings = []
+        fuction_nrs = []
+        for i in range(1000, 1100):
+            for f in range(1, 25):
+                fun, opt = bbob.instantiate(f, i)
+                bbob_y = np.asarray(list(map(fun, self.sample)))
+                array_y = (bbob_y.flatten() - np.min(bbob_y)) / (
+                    np.max(bbob_y) - np.min(bbob_y)
+                )
+                encoded = obj.encode([array_y])
+                encodings.append(encoded[0])
+                fuction_nrs.append(f)
+        X = np.array(encodings)
+        y = np.array(fuction_nrs).flatten()
+        print(X.shape, y.shape)
+        print(np.unique(y))
+        # y_dense = LabelBinarizer().fit_transform(y)
+        
+
+        rf = RandomForestClassifier(n_estimators=100)
+        cv_score = cross_val_score(rf, X, y, cv=5)
+        print(cv_score)
+        if self.use_mlflow:
+            mlflow.log_metric("CV score mean", np.mean(cv_score))
+        else:
+            return cv_score
+
     def visualizeTestData(self, n=5):
         """Get a visualisation of the validation data.
 
@@ -423,9 +484,9 @@ class doe_model:
             n (int, optional): The number of validation DOEs to show. Defaults to 5.
         """
         if self.use_VAE:
-            encoded_does, _z_log_var, _z = self.autoencoder.encoder(self.test_dataX)
+            encoded_does, _z_log_var, _z = self.autoencoder.encoder(self.test_data)
         else:
-            encoded_does = self.autoencoder.encoder(self.test_dataX).numpy()
+            encoded_does = self.autoencoder.encoder(self.test_data).numpy()
         decoded_does = self.autoencoder.decoder(encoded_does).numpy()
         fig = plt.figure(figsize=(n * 4, 8))
         for i in range(n):
@@ -486,18 +547,28 @@ if __name__ == "__main__":
 
     obj = doe_model(
         2,
-        8,
-        n=50000,
-        latent_dim=16,
-        kl_weight=0.001,
-        use_mlflow=False,
-        model_type="VAE",
+        10,
+        n=2400,
+        latent_dim=8,
+        kl_weight=0.01,
+        use_mlflow=True,
+        model_type="AE",
+        augment=True,
+        use_bbob=True
     )
 
+    #if (not obj.loadData("/data/doe2vec/data")):
     obj.generateData()
+    
     obj.compile()
     obj.fit(100)
-    obj.save(model_dir="/data/doe2vec/model/", data_dir="data/doe2vec/data/")
+    obj.save(model_dir="/data/doe2vec/model", data_dir="/data/doe2vec/data")
     #obj.load_from_huggingface()
     # test the model
     obj.plot_label_clusters_bbob()
+    #resRf = rf.predict(X_test)
+
+    #plot_confusion_matrix(
+    #    y_test, resRf, np.unique(fuction_groups), title="Random Forest Confusion Matrix_ELA"
+    #)
+
