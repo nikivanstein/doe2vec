@@ -74,8 +74,8 @@ class VAE(Model):
 
     def _decoder(self):
         latent_inputs = tf.keras.Input(shape=(self.latent_dim,))
-        x = layers.Dense(self.sample_size / 4, activation="relu")(latent_inputs)
-        x = layers.Dense(self.sample_size / 2, activation="relu")(x)
+        x = layers.Dense(int(self.sample_size / 4), activation="relu")(latent_inputs)
+        x = layers.Dense(int(self.sample_size / 2), activation="relu")(x)
         decoder_outputs = layers.Dense(self.sample_size, activation="sigmoid")(x)
         decoder = tf.keras.Model(latent_inputs, decoder_outputs, name="decoder")
         decoder.summary()
