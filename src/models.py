@@ -63,8 +63,8 @@ class VAE(Model):
 
     def _encoder(self):
         encoder_inputs = tf.keras.Input(shape=(self.sample_size,))
-        x = layers.Dense(self.sample_size / 2, activation="relu")(encoder_inputs)
-        x = layers.Dense(self.sample_size / 4, activation="relu")(x)
+        x = layers.Dense(int(self.sample_size / 2), activation="relu")(encoder_inputs)
+        x = layers.Dense(int(self.sample_size / 4), activation="relu")(x)
         z_mean = layers.Dense(self.latent_dim, name="z_mean")(x)
         z_log_var = layers.Dense(self.latent_dim, name="z_log_var")(x)
         z = Sampling()([z_mean, z_log_var])
@@ -74,8 +74,8 @@ class VAE(Model):
 
     def _decoder(self):
         latent_inputs = tf.keras.Input(shape=(self.latent_dim,))
-        x = layers.Dense(self.sample_size / 4, activation="relu")(latent_inputs)
-        x = layers.Dense(self.sample_size / 2, activation="relu")(x)
+        x = layers.Dense(int(self.sample_size / 4), activation="relu")(latent_inputs)
+        x = layers.Dense(int(self.sample_size / 2), activation="relu")(x)
         decoder_outputs = layers.Dense(self.sample_size, activation="sigmoid")(x)
         decoder = tf.keras.Model(latent_inputs, decoder_outputs, name="decoder")
         decoder.summary()
